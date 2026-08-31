@@ -1,4 +1,4 @@
-import { Search, Bell, CircleHelp, ChevronDown } from "lucide-react";
+import { Search, Bell, CircleHelp } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
 const pageTitles: Record<string, string> = {
