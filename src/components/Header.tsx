@@ -72,7 +72,7 @@ export default function Header() {
 
 
         {/* User */}
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
 
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-500 text-sm font-medium text-white">
             EM
@@ -93,7 +93,7 @@ export default function Header() {
             className="text-slate-500"
           />
 
-        </div>
+        </div> */}
 
       </div>
 

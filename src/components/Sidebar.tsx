@@ -27,7 +27,7 @@ const navigation = [
   { name: "Users",       path: "/users",       icon: Users           },
   { name: "Locations",   path: "/locations",   icon: MapPin          },
   { name: "Reports",     path: "/reports",     icon: BarChart3       },
-  { name: "Lifecycle",   path: "/lifecycle",   icon: Recycle, badge: "NEW" },
+  { name: "Lifecycle",   path: "/lifecycle",   icon: Recycle },
   { name: "Settings",    path: "/settings",    icon: Settings        },
 ];
 
@@ -123,12 +123,12 @@ export default function Sidebar() {
               {!collapsed && (
                 <span className="flex flex-1 items-center justify-between">
                   <span className="text-base">{item.name}</span>
-                  {/* Badge is type-safe via the navigation array */}
+                  {/* Badge is type-safe via the navigation array
                   {"badge" in item && item.badge && (
                     <span className="rounded bg-purple-400 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                       {item.badge}
                     </span>
-                  )}
+                  )} */}
                 </span>
               )}
             </NavLink>
@@ -202,35 +202,24 @@ export default function Sidebar() {
 
 
         {/* User profile */}
-        <div className="rounded-lg bg-[#343434] p-3">
-
+        {/* <div className="rounded-lg bg-[#343434] p-3">
           <div className="flex items-center gap-3">
-
-            {/* Avatar */}
             <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-400 text-sm font-semibold">
               EM
-
-              {/* Online indicator */}
               <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-300 ring-2 ring-[#343434]" />
             </div>
-
-
-            {/* User information */}
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">
                   Esther Mukuye
                 </p>
-
                 <p className="truncate text-xs text-gray-400">
                   IT Administrator
                 </p>
               </div>
             )}
-
           </div>
-
-        </div>
+        </div> */}
 
       </div>
 
