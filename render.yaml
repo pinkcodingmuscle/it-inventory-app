@@ -1,25 +1,19 @@
-services:
-  - type: web
-    name: it-inventory-api
-    runtime: node
-    rootDir: server
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
-    preDeployCommand: npm run db:migrate
-    healthCheckPath: /api/health
-    plan: starter
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: it-inventory-db
-          property: connectionString
-      - key: CORS_ORIGIN
-        sync: false
-      - key: NODE_ENV
-        value: production
-
-  - type: psql
-    name: it-inventory-db
-    plan: basic-256mb
-    databaseName: it_inventory
-    user: inventory_app
+# Exported from Render on 2026-09-15T16:22:17Z
+version: "1"
+projects:
+- name: My project
+  environments:
+  - name: Production
+    services:
+    - type: web
+      name: it-inventory-app
+      runtime: node
+      repo: https://github.com/pinkcodingmuscle/it-inventory-app
+      plan: 0.5c-512mb
+      region: oregon
+      buildCommand: npm ci && npm run build
+      startCommand: npm start
+      preDeployCommand: npm run db:migrate
+      healthCheckPath: /api/health
+      autoDeployTrigger: commit
+      rootDir: server
