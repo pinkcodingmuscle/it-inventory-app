@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: it-inventory-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    preDeployCommand: npm run db:migrate
+    healthCheckPath: /api/health
+    plan: starter
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: it-inventory-db
+          property: connectionString
+      - key: CORS_ORIGIN
+        sync: false
+      - key: NODE_ENV
+        value: production
+
+  - type: psql
+    name: it-inventory-db
+    plan: basic-256mb
+    databaseName: it_inventory
+    user: inventory_app

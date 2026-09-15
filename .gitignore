@@ -27,6 +27,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Confidential inventory workbooks
+src/data/IT Inventory Workbook.xlsx
 docs/data-structure-proposal.md
 .gitignore
 .gitignore
@@ -36,3 +39,4 @@ docs/database-persistence-proposal.md
 src/data/IT Inventory Workbook.xlsx
 server/.env.example
 docker-compose.yml
+docs/low-cost-business-deployment-proposal.md
