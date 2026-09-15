@@ -11,7 +11,7 @@ projects:
       repo: https://github.com/pinkcodingmuscle/it-inventory-app
       plan: 0.5c-512mb
       region: oregon
-      buildCommand: npm ci && npm run build
+      buildCommand: npm ci --include=dev && npm run build
       startCommand: npm start
       preDeployCommand: npm run db:migrate
       healthCheckPath: /api/health
