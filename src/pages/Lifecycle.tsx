@@ -1,41 +1,49 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, Clock, CheckCircle } from "lucide-react";
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { getLifecycleStats, listAssetLifecycle } from "../lib/selectors";
+import type { LifecycleBucket } from "../lib/lifecycle";
 
-type Status = "Past EOL" | "0\u201330 days" | "31\u201360 days" | "61\u201390 days" | "On Track";
-
-const stats = [
-  { label: "Past EOL",           value: 8,  icon: AlertTriangle, color: "bg-red-50 text-red-600"     },
-  { label: "Due in 90 Days",     value: 15, icon: Clock,         color: "bg-amber-50 text-amber-600" },
-  { label: "Replaced This Year", value: 23, icon: CheckCircle,   color: "bg-green-50 text-green-600" },
-];
-
-const assets: { name: string; type: string; assignedTo: string; purchaseDate: string; age: string; dueDate: string; remaining: string; status: Status }[] = [
-  { name: "Dell Latitude 5530",  type: "Laptop",  assignedTo: "John Smith",    purchaseDate: "Mar 2021", age: "5.4 yrs", dueDate: "Mar 2024", remaining: "Past EOL", status: "Past EOL"         },
-  { name: "HP EliteBook 840 G8", type: "Laptop",  assignedTo: "Sarah Lee",     purchaseDate: "Jan 2021", age: "5.6 yrs", dueDate: "Jun 2025", remaining: "Past EOL", status: "Past EOL"         },
-  { name: 'MacBook Pro 14"',     type: "Laptop",  assignedTo: "IT Admin",      purchaseDate: "Jun 2022", age: "4.2 yrs", dueDate: "Sep 2026", remaining: "21 days",  status: "0\u201330 days"   },
-  { name: "Dell OptiPlex 7080",  type: "Desktop", assignedTo: "Reception",     purchaseDate: "Aug 2021", age: "5.0 yrs", dueDate: "Oct 2026", remaining: "36 days",  status: "31\u201360 days" },
-  { name: "Lenovo ThinkPad T490",type: "Laptop",  assignedTo: "Tech Support",  purchaseDate: "Aug 2023", age: "3.0 yrs", dueDate: "Nov 2026", remaining: "77 days",  status: "61\u201390 days" },
-  { name: "Lenovo ThinkCentre",  type: "Desktop", assignedTo: "HR Department", purchaseDate: "Feb 2023", age: "3.5 yrs", dueDate: "Feb 2027", remaining: "162 days", status: "On Track"        },
-  { name: "HP LaserJet M404n",   type: "Printer", assignedTo: "IT Storage",    purchaseDate: "Nov 2022", age: "3.8 yrs", dueDate: "Nov 2028", remaining: "2+ years", status: "On Track"        },
-];
-
-const statusStyles: Record<Status, string> = {
-  "Past EOL":         "bg-red-100 text-red-700",
-  "0\u201330 days":   "bg-orange-100 text-orange-700",
-  "31\u201360 days":  "bg-amber-100 text-amber-700",
-  "61\u201390 days":  "bg-yellow-100 text-yellow-700",
-  "On Track":         "bg-green-100 text-green-700",
+const filters = ["All", "past_eol", "0_30", "31_60", "61_90", "on_track"] as const;
+type Filter = typeof filters[number];
+const filterLabels: Record<Filter, string> = {
+  All: "All",
+  past_eol: "Past EOL",
+  "0_30": "0–30 days",
+  "31_60": "31–60 days",
+  "61_90": "61–90 days",
+  on_track: "On Track",
 };
 
-const filters = ["All", "Past EOL", "0\u201330 days", "31\u201360 days", "61\u201390 days", "On Track"] as const;
-type Filter = typeof filters[number];
+const statusStyles: Record<LifecycleBucket, string> = {
+  past_eol: "bg-red-100 text-red-700",
+  "0_30": "bg-orange-100 text-orange-700",
+  "31_60": "bg-amber-100 text-amber-700",
+  "61_90": "bg-yellow-100 text-yellow-700",
+  "91_180": "bg-gray-100 text-gray-700",
+  "181_365": "bg-gray-100 text-gray-700",
+  on_track: "bg-green-100 text-green-700",
+  no_date: "bg-gray-100 text-gray-500",
+};
 
 export default function Lifecycle() {
+  const { revision } = useData();
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
 
-  const filtered = activeFilter === "All" ? assets : assets.filter((a) => a.status === activeFilter);
+  const assets = useMemo(() => listAssetLifecycle(), [revision]);
+  const lifecycleStats = useMemo(() => getLifecycleStats(), [revision]);
+
+  const stats = [
+    { label: "Past EOL",           value: lifecycleStats.pastEol,          icon: AlertTriangle, color: "bg-red-50 text-red-600"     },
+    { label: "Due in 90 Days",     value: lifecycleStats.dueIn90Days,      icon: Clock,         color: "bg-amber-50 text-amber-600" },
+    { label: "Replaced This Year", value: lifecycleStats.replacedThisYear, icon: CheckCircle,   color: "bg-green-50 text-green-600" },
+  ];
+
+  const filtered = activeFilter === "All" ? assets : assets.filter((a) => a.bucket === activeFilter);
 
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Track replacement cycles and plan asset refreshes.</p>
@@ -73,7 +81,7 @@ export default function Lifecycle() {
                     : "text-gray-500 hover:text-gray-800"
                 }`}
               >
-                {f}
+                {filterLabels[f]}
               </button>
             ))}
           </div>
@@ -94,17 +102,17 @@ export default function Lifecycle() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map((asset) => (
-              <tr key={asset.name} className="hover:bg-gray-50">
+              <tr key={asset.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 font-medium text-gray-900">{asset.name}</td>
                 <td className="px-6 py-4 text-gray-600">{asset.type}</td>
                 <td className="px-6 py-4 text-gray-600">{asset.assignedTo}</td>
                 <td className="px-6 py-4 text-gray-600">{asset.purchaseDate}</td>
                 <td className="px-6 py-4 text-gray-600">{asset.age}</td>
                 <td className="px-6 py-4 text-gray-600">{asset.dueDate}</td>
-                <td className={`px-6 py-4 font-medium ${asset.status === "Past EOL" ? "text-red-600" : "text-gray-700"}`}>{asset.remaining}</td>
+                <td className={`px-6 py-4 font-medium ${asset.bucket === "past_eol" ? "text-red-600" : "text-gray-700"}`}>{asset.remaining}</td>
                 <td className="px-6 py-4">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[asset.status]}`}>
-                    {asset.status}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[asset.bucket]}`}>
+                    {asset.bucketLabel}
                   </span>
                 </td>
               </tr>
@@ -113,5 +121,6 @@ export default function Lifecycle() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

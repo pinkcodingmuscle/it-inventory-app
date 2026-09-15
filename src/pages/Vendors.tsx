@@ -1,15 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, Plus, Building2 } from "lucide-react";
-
-const vendorData = [
-  { id: 1, name: "Dell Technologies", category: "Hardware",    contact: "Mike Rogers", email: "mrogers@dell.com",          phone: "(512) 338-4400", supplied: 128 },
-  { id: 2, name: "HP Inc.",           category: "Hardware",    contact: "Amy Chen",    email: "achen@hp.com",              phone: "(650) 857-1501", supplied: 64  },
-  { id: 3, name: "Apple",             category: "Hardware",    contact: "Sales Desk",  email: "sales@apple.com",           phone: "(408) 996-1010", supplied: 12  },
-  { id: 4, name: "Microsoft",         category: "Software",    contact: "Tom Haley",   email: "thaley@microsoft.com",      phone: "(425) 882-8080", supplied: 156 },
-  { id: 5, name: "Adobe Systems",     category: "Software",    contact: "Laura Kim",   email: "lkim@adobe.com",            phone: "(408) 536-6000", supplied: 37  },
-  { id: 6, name: "Lenovo",            category: "Hardware",    contact: "Sales Team",  email: "sales@lenovo.com",          phone: "(919) 257-6700", supplied: 29  },
-  { id: 7, name: "Cable Matters",     category: "Accessories", contact: "Orders Team", email: "orders@cablematters.com",   phone: "(503) 217-3800", supplied: 88  },
-];
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { listVendors } from "../lib/selectors";
 
 const categoryColors: Record<string, string> = {
   Hardware:    "bg-blue-100 text-blue-700",
@@ -18,14 +11,18 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Vendors() {
+  const { revision } = useData();
   const [search, setSearch] = useState("");
+
+  const vendorData = useMemo(() => listVendors(), [revision]);
 
   const filtered = vendorData.filter((v) =>
     v.name.toLowerCase().includes(search.toLowerCase()) ||
-    v.category.toLowerCase().includes(search.toLowerCase())
+    v.categoryLabel.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Manage suppliers and procurement contacts.</p>
@@ -70,14 +67,14 @@ export default function Vendors() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${categoryColors[vendor.category] ?? "bg-gray-100 text-gray-600"}`}>
-                    {vendor.category}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${categoryColors[vendor.categoryLabel] ?? "bg-gray-100 text-gray-600"}`}>
+                    {vendor.categoryLabel}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-gray-600">{vendor.contact}</td>
                 <td className="px-6 py-4 text-gray-500">{vendor.email}</td>
                 <td className="px-6 py-4 text-gray-500">{vendor.phone}</td>
-                <td className="px-6 py-4 text-gray-600">{vendor.supplied}</td>
+                <td className="px-6 py-4 text-gray-600">{vendor.suppliedCount}</td>
               </tr>
             ))}
             {filtered.length === 0 && (
@@ -89,5 +86,6 @@ export default function Vendors() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

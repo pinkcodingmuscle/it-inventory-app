@@ -1,37 +1,30 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, AlertTriangle } from "lucide-react";
-
-type StockStatus = "OK" | "Low" | "Out";
-
-const consumableData: { id: number; name: string; category: string; stock: number; threshold: number; location: string; status: StockStatus }[] = [
-  { id: 1, name: "USB-C Cables",          category: "Cables",       stock: 2,  threshold: 5,  location: "IT Storage Room", status: "Low" },
-  { id: 2, name: "HDMI Cables",           category: "Cables",       stock: 8,  threshold: 5,  location: "IT Storage Room", status: "OK"  },
-  { id: 3, name: "HP 58A Toner",          category: "Toner",        stock: 0,  threshold: 2,  location: "IT Storage Room", status: "Out" },
-  { id: 4, name: "AA Batteries",          category: "Batteries",    stock: 24, threshold: 10, location: "Help Desk",       status: "OK"  },
-  { id: 5, name: "Wireless Mice",         category: "Peripherals",  stock: 3,  threshold: 3,  location: "IT Storage Room", status: "Low" },
-  { id: 6, name: "USB-A to USB-B Cables", category: "Cables",       stock: 5,  threshold: 3,  location: "IT Storage Room", status: "OK"  },
-  { id: 7, name: "Laptop Power Adapters", category: "Accessories",  stock: 0,  threshold: 2,  location: "IT Storage Room", status: "Out" },
-  { id: 8, name: "Cleaning Wipes",        category: "Accessories",  stock: 40, threshold: 10, location: "Help Desk",       status: "OK"  },
-];
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { getConsumableStats, listConsumables } from "../lib/selectors";
+import type { StockStatus } from "../lib/inventory";
 
 const statusStyles: Record<StockStatus, string> = {
-  OK:  "bg-green-100 text-green-700",
-  Low: "bg-amber-100 text-amber-700",
-  Out: "bg-red-100 text-red-700",
+  ok:  "bg-green-100 text-green-700",
+  low: "bg-amber-100 text-amber-700",
+  out: "bg-red-100 text-red-700",
 };
 
 export function Consumables() {
+  const { revision } = useData();
   const [search, setSearch] = useState("");
+
+  const consumableData = useMemo(() => listConsumables(), [revision]);
+  const stats = useMemo(() => getConsumableStats(), [revision]);
 
   const filtered = consumableData.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.category.toLowerCase().includes(search.toLowerCase())
   );
 
-  const lowCount = consumableData.filter((c) => c.status === "Low").length;
-  const outCount = consumableData.filter((c) => c.status === "Out").length;
-
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Monitor bulk stock items and reorder thresholds.</p>
@@ -39,15 +32,15 @@ export function Consumables() {
 
       <div className="mb-6 grid grid-cols-3 gap-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-gray-900">{consumableData.length}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.itemTypes}</p>
           <p className="mt-1 text-sm text-gray-500">Item Types</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-amber-600">{lowCount}</p>
+          <p className="text-3xl font-bold text-amber-600">{stats.lowCount}</p>
           <p className="mt-1 text-sm text-gray-500">Low Stock</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-red-600">{outCount}</p>
+          <p className="text-3xl font-bold text-red-600">{stats.outCount}</p>
           <p className="mt-1 text-sm text-gray-500">Out of Stock</p>
         </div>
       </div>
@@ -80,19 +73,19 @@ export function Consumables() {
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2 font-medium text-gray-900">
-                    {item.status !== "OK" && (
-                      <AlertTriangle size={14} className={item.status === "Out" ? "text-red-500" : "text-amber-500"} />
+                    {item.status !== "ok" && (
+                      <AlertTriangle size={14} className={item.status === "out" ? "text-red-500" : "text-amber-500"} />
                     )}
                     {item.name}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-gray-600">{item.category}</td>
-                <td className="px-6 py-4 font-semibold text-gray-900">{item.stock}</td>
-                <td className="px-6 py-4 text-gray-500">{item.threshold}</td>
+                <td className="px-6 py-4 font-semibold text-gray-900">{item.quantity}</td>
+                <td className="px-6 py-4 text-gray-500">{item.reorderPoint}</td>
                 <td className="px-6 py-4 text-gray-600">{item.location}</td>
                 <td className="px-6 py-4">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[item.status]}`}>
-                    {item.status}
+                    {item.statusLabel}
                   </span>
                 </td>
               </tr>
@@ -106,5 +99,6 @@ export function Consumables() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

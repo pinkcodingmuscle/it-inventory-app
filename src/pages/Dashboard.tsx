@@ -1,88 +1,24 @@
+import { useMemo } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   BarChart, Bar,
 } from "recharts";
 import { Monitor, Users, Package, Clock, AlertTriangle, TrendingUp, FileText, Plus, Eye, Upload } from "lucide-react";
-
-const statCards = [
-  { label: "Total Assets",    value: "247", sub: "↑ 12 (5.1%) from last month", subColor: "text-green-600",  icon: Monitor,       iconBg: "bg-blue-50 text-blue-600"     },
-  { label: "Assigned Assets", value: "192", sub: "77.7% of total assets",        subColor: "text-gray-500",   icon: Users,         iconBg: "bg-purple-50 text-purple-600" },
-  { label: "Available Assets",value: "55",  sub: "22.3% of total assets",        subColor: "text-gray-500",   icon: Package,       iconBg: "bg-green-50 text-green-600"   },
-  { label: "Assets Near EOL", value: "15",  sub: "Within 90 days",               subColor: "text-amber-600",  icon: Clock,         iconBg: "bg-amber-50 text-amber-600"   },
-  { label: "Assets Past EOL", value: "8",   sub: "Requires immediate action",    subColor: "text-red-600",    icon: AlertTriangle, iconBg: "bg-red-50 text-red-600"       },
-];
-
-const categoryData = [
-  { name: "Laptops",     value: 84, color: "#6366f1" },
-  { name: "Desktops",    value: 52, color: "#8b5cf6" },
-  { name: "Monitors",    value: 37, color: "#06b6d4" },
-  { name: "Printers",    value: 25, color: "#10b981" },
-  { name: "Accessories", value: 17, color: "#f59e0b" },
-  { name: "Networking",  value: 20, color: "#f43f5e" },
-  { name: "Other",       value: 12, color: "#94a3b8" },
-];
-
-const inventoryStatusData = [
-  { name: "In Stock",     value: 107, color: "#10b981" },
-  { name: "Low Stock",    value: 18,  color: "#f59e0b" },
-  { name: "On Order",     value: 15,  color: "#6366f1" },
-  { name: "Out of Stock", value: 7,   color: "#f43f5e" },
-];
-
-const lifecycleSummaryData = [
-  { name: "0–6 months",  value: 55, color: "#10b981" },
-  { name: "6–12 months", value: 40, color: "#06b6d4" },
-  { name: "1–2 years",   value: 70, color: "#6366f1" },
-  { name: "2–3 years",   value: 45, color: "#8b5cf6" },
-  { name: "Past EOL",    value: 23, color: "#f43f5e" },
-  { name: "No Date",     value: 14, color: "#94a3b8" },
-];
-
-const eolBuckets = [
-  { label: "Past EOL",     count: 8,  color: "text-red-600"    },
-  { label: "0–30 days",    count: 3,  color: "text-red-500"    },
-  { label: "31–60 days",   count: 4,  color: "text-orange-500" },
-  { label: "61–90 days",   count: 8,  color: "text-amber-600"  },
-  { label: "91–180 days",  count: 15, color: "text-gray-700"   },
-  { label: "181–365 days", count: 22, color: "text-gray-700"   },
-];
-
-const timelineData = [
-  { label: "Past EOL", count: 8  },
-  { label: "0–30",     count: 3  },
-  { label: "31–60",    count: 4  },
-  { label: "61–90",    count: 8  },
-  { label: "91–180",   count: 15 },
-  { label: "181–365",  count: 22 },
-  { label: "1–2 yrs",  count: 84 },
-  { label: "2–3 yrs",  count: 70 },
-  { label: "No Date",  count: 14 },
-];
-
-const topLocations = [
-  { name: "IT Storage",  assets: 84 },
-  { name: "Employees",   assets: 73 },
-  { name: "Main Office", assets: 61 },
-  { name: "Help Desk",   assets: 12 },
-  { name: "Warehouse",   assets: 7  },
-];
-
-const recentPurchases = [
-  { item: "Dell Latitude 5530 (10)", vendor: "Dell",  date: "Aug 10", amount: "$18,500" },
-  { item: "HP 58A Toner (3)",        vendor: "HP",    date: "Aug 15", amount: "$420"    },
-  { item: "USB-C Cables (20)",       vendor: "Cables",date: "Aug 18", amount: "$180"    },
-  { item: 'MacBook Pro 14" (2)',      vendor: "Apple", date: "Jul 28", amount: "$5,998"  },
-  { item: "Adobe CC (25 seats)",     vendor: "Adobe", date: "Jul 5",  amount: "$14,999" },
-];
-
-const eolAssets = [
-  { tag: "LAP-001", name: "Dell Latitude 5530",  category: "Laptop",  assignedTo: "John Smith",   dueDate: "Mar 2024", remaining: "Past EOL", status: "Past EOL",   statusColor: "bg-red-100 text-red-700"       },
-  { tag: "LAP-002", name: "HP EliteBook 840 G8", category: "Laptop",  assignedTo: "Sarah Lee",    dueDate: "Jun 2025", remaining: "Past EOL", status: "Past EOL",   statusColor: "bg-red-100 text-red-700"       },
-  { tag: "LAP-003", name: 'MacBook Pro 14"',     category: "Laptop",  assignedTo: "IT Admin",     dueDate: "Sep 2026", remaining: "21 days",  status: "0–30 days",  statusColor: "bg-orange-100 text-orange-700" },
-  { tag: "DKT-004", name: "Dell OptiPlex 7080",  category: "Desktop", assignedTo: "Reception",    dueDate: "Oct 2026", remaining: "36 days",  status: "31–60 days", statusColor: "bg-amber-100 text-amber-700"  },
-  { tag: "LAP-009", name: "Lenovo ThinkPad T490",category: "Laptop",  assignedTo: "Tech Support", dueDate: "Nov 2026", remaining: "77 days",  status: "61–90 days", statusColor: "bg-yellow-100 text-yellow-700" },
-];
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import {
+  getAssetsByCategory,
+  getDashboardStats,
+  getEolAssetsTable,
+  getEolBuckets,
+  getInventoryStatusBreakdown,
+  getLifecycleAgeBreakdown,
+  getLifecycleTimeline,
+  getRecentPurchases,
+  getTopLocations,
+  type DonutEntry,
+} from "../lib/selectors";
 
 const quickActions = [
   { label: "Add New Asset",      icon: Plus,     color: "bg-blue-50 text-blue-600"     },
@@ -90,8 +26,6 @@ const quickActions = [
   { label: "Import Assets",      icon: Upload,   color: "bg-green-50 text-green-600"   },
   { label: "Generate Report",    icon: FileText, color: "bg-amber-50 text-amber-600"   },
 ];
-
-type DonutEntry = { name: string; value: number; color: string };
 
 function DonutChart({ data, total, label }: { data: DonutEntry[]; total: number; label: string }) {
   return (
@@ -126,7 +60,29 @@ function DonutChart({ data, total, label }: { data: DonutEntry[]; total: number;
 }
 
 export function Dashboard() {
+  const { revision } = useData();
+  const stats = useMemo(() => getDashboardStats(), [revision]);
+  const categoryData = useMemo(() => getAssetsByCategory(), [revision]);
+  const inventoryStatusData = useMemo(() => getInventoryStatusBreakdown(), [revision]);
+  const lifecycleSummaryData = useMemo(() => getLifecycleAgeBreakdown(), [revision]);
+  const eolBuckets = useMemo(() => getEolBuckets(), [revision]);
+  const timelineData = useMemo(() => getLifecycleTimeline(), [revision]);
+  const topLocations = useMemo(() => getTopLocations(5), [revision]);
+  const recentPurchases = useMemo(() => getRecentPurchases(5), [revision]);
+  const eolAssets = useMemo(() => getEolAssetsTable(new Date(), 5), [revision]);
+
+  const inventoryItemCount = inventoryStatusData.reduce((sum, d) => sum + d.value, 0);
+
+  const statCards = [
+    { label: "Total Assets",     value: String(stats.totalAssets), sub: "Across all locations", subColor: "text-gray-500", icon: Monitor,       iconBg: "bg-blue-50 text-blue-600"     },
+    { label: "Assigned Assets",  value: String(stats.assignedAssets), sub: `${stats.totalAssets ? Math.round((stats.assignedAssets / stats.totalAssets) * 100) : 0}% of total assets`, subColor: "text-gray-500", icon: Users, iconBg: "bg-purple-50 text-purple-600" },
+    { label: "Available Assets", value: String(stats.availableAssets), sub: `${stats.totalAssets ? Math.round((stats.availableAssets / stats.totalAssets) * 100) : 0}% of total assets`, subColor: "text-gray-500", icon: Package, iconBg: "bg-green-50 text-green-600"   },
+    { label: "Assets Near EOL",  value: String(stats.assetsNearEol), sub: "Within 90 days",       subColor: "text-amber-600", icon: Clock,       iconBg: "bg-amber-50 text-amber-600"   },
+    { label: "Assets Past EOL",  value: String(stats.assetsPastEol), sub: "Requires immediate action", subColor: "text-red-600", icon: AlertTriangle, iconBg: "bg-red-50 text-red-600" },
+  ];
+
   return (
+    <DataState>
     <div className="p-8 max-w-7xl mx-auto">
       {/* Header with action buttons */}
       <div className="mb-6 flex items-start justify-between">
@@ -162,11 +118,8 @@ export function Dashboard() {
           <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
             <TrendingUp size={16} />
           </div>
-          <p className="text-2xl font-bold text-gray-900">$412,500</p>
+          <p className="text-2xl font-bold text-gray-900">{stats.totalAssetValueLabel}</p>
           <p className="text-[11px] text-gray-500">Total Asset Value</p>
-          <p className="mt-1.5 flex items-center gap-1 text-[11px] text-green-600">
-            <TrendingUp size={10} /> 7.2% from last month
-          </p>
         </div>
       </div>
 
@@ -174,15 +127,15 @@ export function Dashboard() {
       <div className="mb-5 grid grid-cols-4 gap-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-gray-900">Assets by Category</p>
-          <DonutChart data={categoryData} total={247} label="Total" />
+          <DonutChart data={categoryData} total={stats.totalAssets} label="Total" />
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-gray-900">Inventory Status</p>
-          <DonutChart data={inventoryStatusData} total={147} label="Items" />
+          <DonutChart data={inventoryStatusData} total={inventoryItemCount} label="Items" />
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-gray-900">Lifecycle Summary</p>
-          <DonutChart data={lifecycleSummaryData} total={247} label="Total" />
+          <DonutChart data={lifecycleSummaryData} total={stats.totalAssets} label="Total" />
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
@@ -194,7 +147,7 @@ export function Dashboard() {
           </div>
           <div className="space-y-3">
             {eolBuckets.map((b) => (
-              <div key={b.label} className="flex items-center justify-between">
+              <div key={b.bucket} className="flex items-center justify-between">
                 <span className={`text-xs font-medium ${b.color}`}>{b.label}</span>
                 <span className="text-sm font-semibold text-gray-900">{b.count}</span>
               </div>
@@ -275,9 +228,14 @@ export function Dashboard() {
                   <td className="px-5 py-3 text-gray-600">{asset.category}</td>
                   <td className="px-5 py-3 text-gray-600">{asset.assignedTo}</td>
                   <td className="px-5 py-3 text-gray-600">{asset.dueDate}</td>
-                  <td className={`px-5 py-3 font-medium ${asset.status === "Past EOL" ? "text-red-600" : "text-gray-700"}`}>{asset.remaining}</td>
+                  <td className={`px-5 py-3 font-medium ${asset.bucket === "past_eol" ? "text-red-600" : "text-gray-700"}`}>{asset.remaining}</td>
                   <td className="px-5 py-3">
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${asset.statusColor}`}>{asset.status}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      asset.bucket === "past_eol" ? "bg-red-100 text-red-700" :
+                      asset.bucket === "0_30" ? "bg-orange-100 text-orange-700" :
+                      asset.bucket === "31_60" ? "bg-amber-100 text-amber-700" :
+                      "bg-yellow-100 text-yellow-700"
+                    }`}>{asset.status}</span>
                   </td>
                   <td className="px-5 py-3">
                     <button className="text-gray-400 hover:text-gray-700"><Eye size={15} /></button>
@@ -305,5 +263,6 @@ export function Dashboard() {
         </div>
       </div>
     </div>
+    </DataState>
   );
 }

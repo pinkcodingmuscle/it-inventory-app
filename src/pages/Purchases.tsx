@@ -1,41 +1,42 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { getPurchaseStats, listPurchaseOrders } from "../lib/selectors";
+import type { PurchaseOrderStatus } from "../types/domain";
 
-type PurchaseStatus = "Open" | "Received" | "Cancelled";
-
-const purchaseData: { id: number; po: string; vendor: string; items: string; date: string; total: string; status: PurchaseStatus }[] = [
-  { id: 1, po: "PO-2024-083", vendor: "Cable Matters",    items: "20\u00d7 USB-C Cables",    date: "Aug 18, 2024", total: "$180",    status: "Open"      },
-  { id: 2, po: "PO-2024-082", vendor: "HP Inc.",           items: "3\u00d7 HP 58A Toner",     date: "Aug 15, 2024", total: "$420",    status: "Open"      },
-  { id: 3, po: "PO-2024-081", vendor: "Dell Technologies", items: "10\u00d7 Latitude 5530",   date: "Aug 10, 2024", total: "$18,500", status: "Received"  },
-  { id: 4, po: "PO-2024-079", vendor: "Apple",             items: "2\u00d7 MacBook Pro 14\"", date: "Jul 28, 2024", total: "$5,998",  status: "Received"  },
-  { id: 5, po: "PO-2024-075", vendor: "Adobe Systems",     items: "Adobe CC \u2014 25 seats", date: "Jul 5, 2024",  total: "$14,999", status: "Received"  },
-  { id: 6, po: "PO-2024-070", vendor: "Lenovo",            items: "5\u00d7 ThinkCentre M70q", date: "Jun 20, 2024", total: "$7,250",  status: "Cancelled" },
-];
-
-const statusStyles: Record<PurchaseStatus, string> = {
-  Open:      "bg-blue-100 text-blue-700",
-  Received:  "bg-green-100 text-green-700",
-  Cancelled: "bg-gray-100 text-gray-600",
+const statusStyles: Record<PurchaseOrderStatus, string> = {
+  open:      "bg-blue-100 text-blue-700",
+  received:  "bg-green-100 text-green-700",
+  cancelled: "bg-gray-100 text-gray-600",
 };
 
-const filters = ["All", "Open", "Received", "Cancelled"] as const;
+const filters = ["All", "open", "received", "cancelled"] as const;
 type Filter = typeof filters[number];
+const filterLabels: Record<Filter, string> = {
+  All: "All",
+  open: "Open",
+  received: "Received",
+  cancelled: "Cancelled",
+};
 
 export function Purchases() {
+  const { revision } = useData();
   const [search, setSearch]             = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
 
+  const purchaseData = useMemo(() => listPurchaseOrders(), [revision]);
+  const stats = useMemo(() => getPurchaseStats(), [revision]);
+
   const filtered = purchaseData.filter((p) => {
-    const matchesSearch = p.po.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch = p.poNumber.toLowerCase().includes(search.toLowerCase()) ||
                           p.vendor.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = activeFilter === "All" || p.status === activeFilter;
     return matchesSearch && matchesFilter;
   });
 
-  const openCount     = purchaseData.filter((p) => p.status === "Open").length;
-  const receivedCount = purchaseData.filter((p) => p.status === "Received").length;
-
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Track purchase orders and procurement history.</p>
@@ -43,15 +44,15 @@ export function Purchases() {
 
       <div className="mb-6 grid grid-cols-3 gap-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-blue-600">{openCount}</p>
+          <p className="text-3xl font-bold text-blue-600">{stats.openCount}</p>
           <p className="mt-1 text-sm text-gray-500">Open POs</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-green-600">{receivedCount}</p>
+          <p className="text-3xl font-bold text-green-600">{stats.receivedCount}</p>
           <p className="mt-1 text-sm text-gray-500">Received</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-gray-900">$46,347</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.totalSpendLabel}</p>
           <p className="mt-1 text-sm text-gray-500">Total Spend (2024)</p>
         </div>
       </div>
@@ -76,7 +77,7 @@ export function Purchases() {
                 activeFilter === f ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              {f}
+              {filterLabels[f]}
             </button>
           ))}
         </div>
@@ -97,14 +98,14 @@ export function Purchases() {
           <tbody className="divide-y divide-gray-100">
             {filtered.map((p) => (
               <tr key={p.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-mono text-xs font-medium text-gray-900">{p.po}</td>
+                <td className="px-6 py-4 font-mono text-xs font-medium text-gray-900">{p.poNumber}</td>
                 <td className="px-6 py-4 font-medium text-gray-900">{p.vendor}</td>
                 <td className="px-6 py-4 text-gray-600">{p.items}</td>
                 <td className="px-6 py-4 text-gray-600">{p.date}</td>
-                <td className="px-6 py-4 font-medium text-gray-900">{p.total}</td>
+                <td className="px-6 py-4 font-medium text-gray-900">{p.totalLabel}</td>
                 <td className="px-6 py-4">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[p.status]}`}>
-                    {p.status}
+                    {p.statusLabel}
                   </span>
                 </td>
               </tr>
@@ -118,5 +119,6 @@ export function Purchases() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

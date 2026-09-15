@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { appData } from "../data/store";
 
 export default function Settings() {
+  const { revision } = useData();
   const [organizationName, setOrganizationName] = useState(
     "Kayaku Advanced Materials"
   );
@@ -18,21 +22,15 @@ export default function Settings() {
   const [expirationAlerts, setExpirationAlerts] = useState(true);
   const [expirationWarning, setExpirationWarning] = useState(30);
 
-  const categories = [
-    "Laptops",
-    "Desktops",
-    "Printers",
-    "Toner",
-    "Cables",
-    "Docking Stations",
-  ];
+  const categories = useMemo(
+    () => Array.from(new Set(Object.values(appData.catalogItems).map((c) => c.category))),
+    [revision]
+  );
 
-  const locations = [
-    "IT Storage Room",
-    "Help Desk",
-    "Office",
-    "Assigned to Employee",
-  ];
+  const locations = useMemo(
+    () => Object.values(appData.locations).map((l) => l.name),
+    [revision]
+  );
 
   function handleSave() {
     console.log({
@@ -50,6 +48,7 @@ export default function Settings() {
   }
 
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">
@@ -305,5 +304,6 @@ export default function Settings() {
         </div>
       </div>
     </div>
+    </DataState>
   );
 }

@@ -1,24 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MapPin, Plus, Search } from "lucide-react";
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { appData } from "../data/store";
+import { createLocation, deleteLocation } from "../lib/api";
+import { listLocations } from "../lib/selectors";
+import type { Location } from "../types/domain";
 
-type Location = {
-  id: number;
-  name: string;
-  type: string;
-  assets: number;
-  manager: string;
-  notes: string;
+const typeOptions = ["Storage", "Office", "Meeting", "Remote"] as const;
+
+const typeValues: Record<(typeof typeOptions)[number], Location["type"]> = {
+  Storage: "storage",
+  Office: "office",
+  Meeting: "meeting_room",
+  Remote: "remote",
 };
-
-const initialLocations: Location[] = [
-  { id: 1, name: "IT Storage Room",      type: "Storage",  assets: 84, manager: "Esther Mukuye",  notes: "Primary hardware storage, B1 level"         },
-  { id: 2, name: "Help Desk",            type: "Office",   assets: 12, manager: "Esther Mukuye",  notes: "Front-line support station"                 },
-  { id: 3, name: "Main Office",          type: "Office",   assets: 61, manager: "HR Department",  notes: "Open-plan floor, desks 1–40"               },
-  { id: 4, name: "Conference Room A",    type: "Meeting",  assets:  6, manager: "Facilities",     notes: "AV equipment, projector, video bar"        },
-  { id: 5, name: "Conference Room B",    type: "Meeting",  assets:  4, manager: "Facilities",     notes: "Smaller meeting room, floor 2"            },
-  { id: 6, name: "Assigned to Employee", type: "Remote",   assets: 73, manager: "Esther Mukuye",  notes: "Assets checked out to individual users"   },
-  { id: 7, name: "Off-site Warehouse",   type: "Storage",  assets:  7, manager: "Ops Team",       notes: "Overflow storage, requires access request" },
-];
 
 const typeColors: Record<string, string> = {
   Storage: "bg-blue-100 text-blue-700",
@@ -28,34 +24,58 @@ const typeColors: Record<string, string> = {
 };
 
 export default function Locations() {
-  const [locations, setLocations] = useState<Location[]>(initialLocations);
+  const { revision, refresh } = useData();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState("Office");
-  const [newManager, setNewManager] = useState("");
+  const [newType, setNewType] = useState<(typeof typeOptions)[number]>("Office");
+  const [newManagerId, setNewManagerId] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const locations = useMemo(() => listLocations(), [revision]);
+  const users = useMemo(() => Object.values(appData.users), [revision]);
 
   const filtered = locations.filter((l) =>
     l.name.toLowerCase().includes(search.toLowerCase()) ||
-    l.type.toLowerCase().includes(search.toLowerCase())
+    l.typeLabel.toLowerCase().includes(search.toLowerCase())
   );
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!newName.trim()) return;
-    setLocations((prev) => [
-      ...prev,
-      { id: prev.length + 1, name: newName.trim(), type: newType, assets: 0, manager: newManager.trim() || "Unassigned", notes: newNotes.trim() },
-    ]);
-    setNewName(""); setNewType("Office"); setNewManager(""); setNewNotes("");
-    setShowForm(false);
+    setSaving(true);
+    setFormError(null);
+    try {
+      await createLocation({
+        name: newName.trim(),
+        type: typeValues[newType],
+        managerUserId: newManagerId || undefined,
+        notes: newNotes.trim() || undefined,
+      });
+      await refresh();
+      setNewName(""); setNewType("Office"); setNewManagerId(""); setNewNotes("");
+      setShowForm(false);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to create location.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleDelete(id: number) {
-    setLocations((prev) => prev.filter((l) => l.id !== id));
+  async function handleDelete(id: string) {
+    setRowError(null);
+    try {
+      await deleteLocation(id);
+      await refresh();
+    } catch (err) {
+      setRowError(err instanceof Error ? err.message : "Failed to delete location.");
+    }
   }
 
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Manage where assets are physically stored or assigned.</p>
@@ -82,10 +102,21 @@ export default function Locations() {
         </button>
       </div>
 
+      {rowError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {rowError}
+        </div>
+      )}
+
       {/* Inline add form */}
       {showForm && (
         <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-5">
           <h3 className="mb-4 text-sm font-semibold text-gray-800">New Location</h3>
+          {formError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {formError}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Name *</label>
@@ -101,21 +132,22 @@ export default function Locations() {
               <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
               <select
                 value={newType}
-                onChange={(e) => setNewType(e.target.value)}
+                onChange={(e) => setNewType(e.target.value as (typeof typeOptions)[number])}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
               >
-                {Object.keys(typeColors).map((t) => <option key={t}>{t}</option>)}
+                {typeOptions.map((t) => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Manager</label>
-              <input
-                type="text"
-                value={newManager}
-                onChange={(e) => setNewManager(e.target.value)}
+              <select
+                value={newManagerId}
+                onChange={(e) => setNewManagerId(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                placeholder="e.g. IT Admin"
-              />
+              >
+                <option value="">Unassigned</option>
+                {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Notes</label>
@@ -129,8 +161,12 @@ export default function Locations() {
             </div>
           </div>
           <div className="mt-4 flex gap-2">
-            <button onClick={handleAdd} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              Save
+            <button
+              onClick={handleAdd}
+              disabled={saving}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save"}
             </button>
             <button onClick={() => setShowForm(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
               Cancel
@@ -162,11 +198,11 @@ export default function Locations() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${typeColors[loc.type] ?? "bg-gray-100 text-gray-600"}`}>
-                    {loc.type}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${typeColors[loc.typeLabel] ?? "bg-gray-100 text-gray-600"}`}>
+                    {loc.typeLabel}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-gray-600">{loc.assets}</td>
+                <td className="px-6 py-4 text-gray-600">{loc.assetCount}</td>
                 <td className="px-6 py-4 text-gray-600">{loc.manager}</td>
                 <td className="px-6 py-4 text-gray-500">{loc.notes}</td>
                 <td className="px-6 py-4 text-right">
@@ -190,5 +226,6 @@ export default function Locations() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

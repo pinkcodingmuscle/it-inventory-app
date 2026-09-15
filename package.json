@@ -7,7 +7,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v",
+    "server:install": "npm --prefix server install",
+    "server:dev": "npm --prefix server run dev",
+    "db:migrate": "npm --prefix server run db:migrate",
+    "db:seed": "npm --prefix server run db:seed",
+    "db:import": "npm --prefix server run db:import --"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

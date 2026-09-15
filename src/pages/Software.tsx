@@ -1,30 +1,31 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-
-type SoftwareStatus = "Active" | "Expiring Soon" | "Expired";
-
-const licenseData: { id: number; name: string; vendor: string; type: string; seats: number; used: number; expiry: string; status: SoftwareStatus }[] = [
-  { id: 1, name: "Microsoft 365",        vendor: "Microsoft",      type: "Subscription", seats: 50,  used: 47, expiry: "Jan 15, 2025", status: "Active"        },
-  { id: 2, name: "Adobe Creative Cloud", vendor: "Adobe",          type: "Subscription", seats: 25,  used: 12, expiry: "Jul 5, 2025",  status: "Active"        },
-  { id: 3, name: "Zoom",                 vendor: "Zoom",           type: "Subscription", seats: 100, used: 78, expiry: "Sep 20, 2024", status: "Expiring Soon" },
-  { id: 4, name: "Slack",                vendor: "Salesforce",     type: "Subscription", seats: 50,  used: 44, expiry: "Dec 1, 2024",  status: "Active"        },
-  { id: 5, name: "AutoCAD 2024",         vendor: "Autodesk",       type: "Perpetual",    seats: 3,   used: 2,  expiry: "N/A",          status: "Active"        },
-  { id: 6, name: "Windows 11 Pro",       vendor: "Microsoft",      type: "Volume",       seats: 80,  used: 72, expiry: "N/A",          status: "Active"        },
-  { id: 7, name: "Norton Antivirus",     vendor: "NortonLifeLock", type: "Subscription", seats: 50,  used: 50, expiry: "Oct 10, 2024", status: "Expiring Soon" },
-];
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { getSoftwareStats, listSoftwareLicenses, type SoftwareStatus } from "../lib/selectors";
 
 const statusStyles: Record<SoftwareStatus, string> = {
-  "Active":        "bg-green-100 text-green-700",
-  "Expiring Soon": "bg-amber-100 text-amber-700",
-  "Expired":       "bg-red-100 text-red-700",
+  active:        "bg-green-100 text-green-700",
+  expiring_soon: "bg-amber-100 text-amber-700",
+  expired:       "bg-red-100 text-red-700",
 };
 
-const filters = ["All", "Active", "Expiring Soon", "Expired"] as const;
+const filters = ["All", "active", "expiring_soon", "expired"] as const;
 type Filter = typeof filters[number];
+const filterLabels: Record<Filter, string> = {
+  All: "All",
+  active: "Active",
+  expiring_soon: "Expiring Soon",
+  expired: "Expired",
+};
 
 export function Software() {
+  const { revision } = useData();
   const [search, setSearch]             = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
+
+  const licenseData = useMemo(() => listSoftwareLicenses(), [revision]);
+  const stats = useMemo(() => getSoftwareStats(), [revision]);
 
   const filtered = licenseData.filter((l) => {
     const matchesSearch = l.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -33,11 +34,8 @@ export function Software() {
     return matchesSearch && matchesFilter;
   });
 
-  const expiringCount = licenseData.filter((l) => l.status === "Expiring Soon").length;
-  const totalSeats    = licenseData.reduce((s, l) => s + l.seats, 0);
-  const usedSeats     = licenseData.reduce((s, l) => s + l.used, 0);
-
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Manage software licenses, seats, and expiry dates.</p>
@@ -45,15 +43,15 @@ export function Software() {
 
       <div className="mb-6 grid grid-cols-3 gap-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-gray-900">{licenseData.length}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.totalLicenses}</p>
           <p className="mt-1 text-sm text-gray-500">Total Licenses</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-amber-600">{expiringCount}</p>
+          <p className="text-3xl font-bold text-amber-600">{stats.expiringCount}</p>
           <p className="mt-1 text-sm text-gray-500">Expiring Soon</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-gray-900">{totalSeats - usedSeats}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.seatsAvailable}</p>
           <p className="mt-1 text-sm text-gray-500">Seats Available</p>
         </div>
       </div>
@@ -78,7 +76,7 @@ export function Software() {
                 activeFilter === f ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              {f}
+              {filterLabels[f]}
             </button>
           ))}
         </div>
@@ -118,7 +116,7 @@ export function Software() {
                 <td className="px-6 py-4 text-gray-600">{lic.expiry}</td>
                 <td className="px-6 py-4">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[lic.status]}`}>
-                    {lic.status}
+                    {lic.statusLabel}
                   </span>
                 </td>
               </tr>
@@ -132,5 +130,6 @@ export function Software() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

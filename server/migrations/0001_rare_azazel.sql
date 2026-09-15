@@ -1,0 +1,1 @@
+ALTER TABLE "stock_items" ADD CONSTRAINT "stock_items_catalog_item_location_unique" UNIQUE("catalog_item_id","location_id");

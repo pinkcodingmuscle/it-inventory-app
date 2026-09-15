@@ -1,21 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, Plus } from "lucide-react";
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { getUserStats, listUsers } from "../lib/selectors";
 
-type UserStatus = "Active" | "Inactive";
-
-const userData: { id: number; name: string; initials: string; role: string; department: string; email: string; assets: number; status: UserStatus }[] = [
-  { id: 1, name: "Esther Mukuye",  initials: "EM", role: "IT Administrator", department: "IT",         email: "e.mukuye@kayaku.com",   assets: 3, status: "Active"   },
-  { id: 2, name: "John Smith",     initials: "JS", role: "Engineer",          department: "Operations", email: "j.smith@kayaku.com",    assets: 2, status: "Active"   },
-  { id: 3, name: "Sarah Lee",      initials: "SL", role: "Analyst",           department: "Finance",    email: "s.lee@kayaku.com",      assets: 1, status: "Active"   },
-  { id: 4, name: "Michael Brown",  initials: "MB", role: "Manager",           department: "HR",         email: "m.brown@kayaku.com",    assets: 2, status: "Active"   },
-  { id: 5, name: "Jennifer Davis", initials: "JD", role: "Receptionist",      department: "Admin",      email: "j.davis@kayaku.com",    assets: 1, status: "Active"   },
-  { id: 6, name: "Robert Wilson",  initials: "RW", role: "Tech Support",      department: "IT",         email: "r.wilson@kayaku.com",   assets: 2, status: "Active"   },
-  { id: 7, name: "Linda Martinez", initials: "LM", role: "Intern",            department: "Marketing",  email: "l.martinez@kayaku.com", assets: 1, status: "Inactive" },
-];
-
-const statusStyles: Record<UserStatus, string> = {
-  Active:   "bg-green-100 text-green-700",
-  Inactive: "bg-gray-100 text-gray-600",
+const statusStyles: Record<"active" | "inactive", string> = {
+  active:   "bg-green-100 text-green-700",
+  inactive: "bg-gray-100 text-gray-600",
 };
 
 const avatarColors = [
@@ -24,7 +15,11 @@ const avatarColors = [
 ];
 
 export default function Users() {
+  const { revision } = useData();
   const [search, setSearch] = useState("");
+
+  const userData = useMemo(() => listUsers(), [revision]);
+  const stats = useMemo(() => getUserStats(), [revision]);
 
   const filtered = userData.filter((u) =>
     u.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -32,10 +27,8 @@ export default function Users() {
     u.role.toLowerCase().includes(search.toLowerCase())
   );
 
-  const activeCount   = userData.filter((u) => u.status === "Active").length;
-  const inactiveCount = userData.filter((u) => u.status === "Inactive").length;
-
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Manage employees and their asset assignments.</p>
@@ -43,15 +36,15 @@ export default function Users() {
 
       <div className="mb-6 grid grid-cols-3 gap-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-gray-900">{userData.length}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
           <p className="mt-1 text-sm text-gray-500">Total Users</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-green-600">{activeCount}</p>
+          <p className="text-3xl font-bold text-green-600">{stats.active}</p>
           <p className="mt-1 text-sm text-gray-500">Active</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-gray-400">{inactiveCount}</p>
+          <p className="text-3xl font-bold text-gray-400">{stats.inactive}</p>
           <p className="mt-1 text-sm text-gray-500">Inactive</p>
         </div>
       </div>
@@ -99,10 +92,10 @@ export default function Users() {
                 <td className="px-6 py-4 text-gray-600">{user.role}</td>
                 <td className="px-6 py-4 text-gray-600">{user.department}</td>
                 <td className="px-6 py-4 text-gray-500">{user.email}</td>
-                <td className="px-6 py-4 text-gray-600">{user.assets}</td>
+                <td className="px-6 py-4 text-gray-600">{user.assetCount}</td>
                 <td className="px-6 py-4">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[user.status]}`}>
-                    {user.status}
+                    {user.statusLabel}
                   </span>
                 </td>
               </tr>
@@ -116,5 +109,6 @@ export default function Users() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

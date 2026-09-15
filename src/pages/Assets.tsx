@@ -1,43 +1,43 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Laptop, Search, Eye } from "lucide-react";
-
-type AssetStatus = "Active" | "In Storage" | "Under Repair" | "Retired";
-
-const stats = [
-  { label: "Total Assets", value: 247 },
-  { label: "Active",       value: 192 },
-  { label: "In Storage",   value: 42  },
-  { label: "Under Repair", value: 13  },
-];
-
-const assetData: { id: number; tag: string; name: string; type: string; serial: string; assignedTo: string; location: string; status: AssetStatus }[] = [
-  { id: 1,  tag: "LAP-001", name: "Dell Latitude 5530",      type: "Laptop",  serial: "DL55-001", assignedTo: "John Smith",    location: "Main Office",        status: "Active"       },
-  { id: 2,  tag: "LAP-002", name: "HP EliteBook 840 G8",     type: "Laptop",  serial: "HP84-002", assignedTo: "Sarah Lee",     location: "Main Office",        status: "Active"       },
-  { id: 3,  tag: "LAP-003", name: 'MacBook Pro 14"',         type: "Laptop",  serial: "MB14-003", assignedTo: "IT Admin",      location: "Help Desk",          status: "Active"       },
-  { id: 4,  tag: "DKT-004", name: "Dell OptiPlex 7080",      type: "Desktop", serial: "OP70-004", assignedTo: "Reception",     location: "Main Office",        status: "Active"       },
-  { id: 5,  tag: "DKT-005", name: "Lenovo ThinkCentre M70q", type: "Desktop", serial: "TC70-005", assignedTo: "HR Department", location: "Main Office",        status: "Active"       },
-  { id: 6,  tag: "PRN-006", name: "HP LaserJet M404n",       type: "Printer", serial: "LJ40-006", assignedTo: "\u2014",        location: "IT Storage Room",    status: "In Storage"   },
-  { id: 7,  tag: "LAP-007", name: "Dell Latitude 5420",      type: "Laptop",  serial: "DL54-007", assignedTo: "\u2014",        location: "IT Storage Room",    status: "In Storage"   },
-  { id: 8,  tag: "LAP-008", name: "HP ProBook 450 G8",       type: "Laptop",  serial: "PB45-008", assignedTo: "\u2014",        location: "Off-site Warehouse", status: "Retired"      },
-  { id: 9,  tag: "LAP-009", name: "Lenovo ThinkPad T490",    type: "Laptop",  serial: "TP49-009", assignedTo: "Tech Support",  location: "Help Desk",          status: "Under Repair" },
-  { id: 10, tag: "MON-010", name: 'Dell 27" Monitor',        type: "Monitor", serial: "DM27-010", assignedTo: "John Smith",    location: "Main Office",        status: "Active"       },
-];
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { getAssetStats, listAssets, type AssetRow } from "../lib/selectors";
+import type { AssetStatus } from "../types/domain";
 
 const statusStyles: Record<AssetStatus, string> = {
-  "Active":       "bg-green-100 text-green-700",
-  "In Storage":   "bg-blue-100 text-blue-700",
-  "Under Repair": "bg-amber-100 text-amber-700",
-  "Retired":      "bg-gray-100 text-gray-600",
+  active: "bg-green-100 text-green-700",
+  in_storage: "bg-blue-100 text-blue-700",
+  under_repair: "bg-amber-100 text-amber-700",
+  retired: "bg-gray-100 text-gray-600",
 };
 
-const filters = ["All", "Active", "In Storage", "Under Repair", "Retired"] as const;
+const filters = ["All", "active", "in_storage", "under_repair", "retired"] as const;
 type Filter = typeof filters[number];
+const filterLabels: Record<Filter, string> = {
+  All: "All",
+  active: "Active",
+  in_storage: "In Storage",
+  under_repair: "Under Repair",
+  retired: "Retired",
+};
 
 export function Assets() {
+  const { revision } = useData();
   const [search, setSearch]             = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
 
-  const filtered = assetData.filter((a) => {
+  const assetData = useMemo(() => listAssets(), [revision]);
+  const stats = useMemo(() => getAssetStats(), [revision]);
+
+  const statCards = [
+    { label: "Total Assets", value: stats.total },
+    { label: "Active",       value: stats.active },
+    { label: "In Storage",   value: stats.inStorage },
+    { label: "Under Repair", value: stats.underRepair },
+  ];
+
+  const filtered = assetData.filter((a: AssetRow) => {
     const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
                           a.serial.toLowerCase().includes(search.toLowerCase()) ||
                           a.assignedTo.toLowerCase().includes(search.toLowerCase());
@@ -46,13 +46,14 @@ export function Assets() {
   });
 
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Track all individually serialized IT assets.</p>
       </div>
 
       <div className="mb-6 grid grid-cols-4 gap-5">
-        {stats.map((s) => (
+        {statCards.map((s) => (
           <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-5">
             <p className="text-3xl font-bold text-gray-900">{s.value}</p>
             <p className="mt-1 text-sm text-gray-500">{s.label}</p>
@@ -80,7 +81,7 @@ export function Assets() {
                 activeFilter === f ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              {f}
+              {filterLabels[f]}
             </button>
           ))}
         </div>
@@ -116,7 +117,7 @@ export function Assets() {
                 <td className="px-6 py-4 text-gray-600">{asset.location}</td>
                 <td className="px-6 py-4">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[asset.status]}`}>
-                    {asset.status}
+                    {asset.statusLabel}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -133,5 +134,6 @@ export function Assets() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

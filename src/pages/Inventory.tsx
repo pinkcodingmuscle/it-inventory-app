@@ -1,26 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-
-const inventoryData = [
-  { id: 1,  name: "Dell Latitude 5530",       category: "Laptops",     qty: 12, available: 8,  location: "IT Storage Room" },
-  { id: 2,  name: "HP EliteBook 840 G8",      category: "Laptops",     qty: 8,  available: 5,  location: "IT Storage Room" },
-  { id: 3,  name: 'MacBook Pro 14"',          category: "Laptops",     qty: 4,  available: 1,  location: "Help Desk"       },
-  { id: 4,  name: "Dell OptiPlex 7080",       category: "Desktops",    qty: 15, available: 10, location: "IT Storage Room" },
-  { id: 5,  name: "Lenovo ThinkCentre M70q",  category: "Desktops",    qty: 10, available: 6,  location: "IT Storage Room" },
-  { id: 6,  name: "HP LaserJet M404n",        category: "Printers",    qty: 5,  available: 3,  location: "IT Storage Room" },
-  { id: 7,  name: 'Dell 27" Monitor',         category: "Monitors",    qty: 22, available: 9,  location: "IT Storage Room" },
-  { id: 8,  name: "USB-C Docking Station",    category: "Accessories", qty: 18, available: 7,  location: "IT Storage Room" },
-  { id: 9,  name: "USB-C Cables",             category: "Cables",      qty: 2,  available: 2,  location: "IT Storage Room" },
-  { id: 10, name: "HDMI Cables",              category: "Cables",      qty: 8,  available: 8,  location: "IT Storage Room" },
-  { id: 11, name: "HP 58A Toner",             category: "Toner",       qty: 0,  available: 0,  location: "IT Storage Room" },
-  { id: 12, name: "Wireless Mice",            category: "Peripherals", qty: 3,  available: 3,  location: "IT Storage Room" },
-];
-
-const categories = ["All", ...Array.from(new Set(inventoryData.map((i) => i.category)))];
+import { DataState } from "../components/DataState";
+import { useData } from "../context/useData";
+import { getInventoryStats, listStockItems } from "../lib/selectors";
 
 export function Inventory() {
+  const { revision } = useData();
   const [search, setSearch]     = useState("");
   const [category, setCategory] = useState("All");
+
+  const inventoryData = useMemo(() => listStockItems(), [revision]);
+  const stats = useMemo(() => getInventoryStats(), [revision]);
+  const categories = useMemo(
+    () => ["All", ...Array.from(new Set(inventoryData.map((i) => i.category)))],
+    [inventoryData]
+  );
 
   const filtered = inventoryData.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
@@ -28,11 +22,8 @@ export function Inventory() {
     return matchesSearch && matchesCat;
   });
 
-  const totalQty       = inventoryData.reduce((s, i) => s + i.qty, 0);
-  const totalAvailable = inventoryData.reduce((s, i) => s + i.available, 0);
-  const outOfStock     = inventoryData.filter((i) => i.qty === 0).length;
-
   return (
+    <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Overview of all stockable IT items and availability.</p>
@@ -40,15 +31,15 @@ export function Inventory() {
 
       <div className="mb-6 grid grid-cols-3 gap-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-gray-900">{totalQty}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.totalQty}</p>
           <p className="mt-1 text-sm text-gray-500">Total Units</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-green-600">{totalAvailable}</p>
+          <p className="text-3xl font-bold text-green-600">{stats.totalAvailable}</p>
           <p className="mt-1 text-sm text-gray-500">Available</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <p className="text-3xl font-bold text-red-600">{outOfStock}</p>
+          <p className="text-3xl font-bold text-red-600">{stats.outOfStock}</p>
           <p className="mt-1 text-sm text-gray-500">Out of Stock</p>
         </div>
       </div>
@@ -90,9 +81,9 @@ export function Inventory() {
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
                 <td className="px-6 py-4 text-gray-600">{item.category}</td>
-                <td className="px-6 py-4 font-semibold text-gray-900">{item.qty}</td>
+                <td className="px-6 py-4 font-semibold text-gray-900">{item.quantity}</td>
                 <td className="px-6 py-4 font-medium text-green-600">{item.available}</td>
-                <td className="px-6 py-4 text-gray-600">{item.qty - item.available}</td>
+                <td className="px-6 py-4 text-gray-600">{item.inUse}</td>
                 <td className="px-6 py-4 text-gray-600">{item.location}</td>
               </tr>
             ))}
@@ -105,5 +96,6 @@ export function Inventory() {
         </table>
       </section>
     </div>
+    </DataState>
   );
 }

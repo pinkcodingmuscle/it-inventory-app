@@ -38,9 +38,8 @@ export default function Sidebar() {
     <aside
       className={`
         sticky top-0
-        h-screen
+        flex h-screen flex-col
         shrink-0
-        overflow-y-auto
         bg-[#2B2B2B]
         text-white
         transition-all duration-300
@@ -48,27 +47,27 @@ export default function Sidebar() {
       `}
     >
       {/* Header */}
-      <div className="flex h-24 items-center justify-between px-6">
+      <div className="flex h-14 shrink-0 items-center justify-between px-4">
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Logo */}
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-400">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-400 text-xs font-semibold">
             IT
           </div>
 
           {/* App name */}
           {/* * Hidden when collapsed so the toggle button stays aligned right */}
           {!collapsed && (
-            <span className="text-xl font-semibold"> IT Asset Manager </span>
+            <span className="text-base font-semibold"> IT Asset Manager </span>
           )}
         </div>
 
         {/* Collapse button */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="rounded-lg p-2 text-gray-400 hover:bg-[#383838] hover:text-white"
+          className="rounded-lg p-1.5 text-gray-400 hover:bg-[#383838] hover:text-white"
         >
-          <Menu size={24} />
+          <Menu size={20} />
         </button>
       </div>
 
@@ -96,7 +95,7 @@ export default function Sidebar() {
 
 
       {/* Main navigation */}
-      <nav className="mt-8 px-4">
+      <nav className="mt-3 flex-1 overflow-y-auto px-3">
 
         {navigation.map((item) => {
           const Icon = item.icon;
@@ -107,22 +106,22 @@ export default function Sidebar() {
               to={item.path}
               className={({ isActive }) =>
                 `
-                mb-2 flex h-12 items-center rounded-lg
+                mb-1 flex h-8 items-center rounded-lg
                 transition-colors
                 ${
                   isActive
                     ? "bg-[#3A3A3A] text-white"
                     : "text-gray-400 hover:bg-[#343434] hover:text-white"
                 }
-                ${collapsed ? "justify-center" : "gap-4 px-4"}
+                ${collapsed ? "justify-center" : "gap-3 px-3"}
                 `
               }
             >
-              <Icon size={22} />
+              <Icon size={17} />
 
               {!collapsed && (
                 <span className="flex flex-1 items-center justify-between">
-                  <span className="text-base">{item.name}</span>
+                  <span className="text-sm">{item.name}</span>
                   {/* Badge is type-safe via the navigation array
                   {"badge" in item && item.badge && (
                     <span className="rounded bg-purple-400 px-1.5 py-0.5 text-[10px] font-semibold text-white">
@@ -139,7 +138,7 @@ export default function Sidebar() {
 
 
       {/* Bottom section */}
-      <div className="absolute bottom-0 left-0 w-full px-4 pb-5">
+      <div className="w-full shrink-0 px-3 pb-3">
 
         {/* Notifications
         <NavLink
@@ -168,16 +167,16 @@ export default function Sidebar() {
 
         {/* Need Help card */}
         {!collapsed ? (
-          <div className="mb-3 rounded-lg bg-[#343434] p-3">
-            <p className="text-sm font-semibold text-white">Need Help?</p>
-            <p className="mt-1 text-xs text-gray-400">Submit a request or contact support.</p>
-            <button className="mt-3 w-full rounded-md bg-[#2B2B2B] py-1.5 text-xs font-medium text-white hover:bg-[#3A3A3A]">
+          <div className="rounded-lg bg-[#343434] p-2.5">
+            <p className="text-xs font-semibold text-white">Need Help?</p>
+            <p className="mt-0.5 text-[11px] text-gray-400">Submit a request or contact support.</p>
+            <button className="mt-2 w-full rounded-md bg-[#2B2B2B] py-1 text-[11px] font-medium text-white hover:bg-[#3A3A3A]">
               Contact Support
             </button>
           </div>
         ) : (
-          <div className="mb-3 flex justify-center rounded-lg bg-[#343434] p-3">
-            <CircleHelp size={20} className="text-gray-400" />
+          <div className="flex justify-center rounded-lg bg-[#343434] p-2.5">
+            <CircleHelp size={18} className="text-gray-400" />
           </div>
         )}
 
