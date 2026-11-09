@@ -29,3 +29,4 @@ dist-ssr
 
 # Confidential inventory workbooks (contains real, non-public inventory data)
 src/data/IT Inventory Workbook.xlsx
+.neon

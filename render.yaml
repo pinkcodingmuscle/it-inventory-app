@@ -12,7 +12,9 @@ projects:
       runtime: node
       repo: https://github.com/pinkcodingmuscle/it-inventory-app
       plan: 0.5c-512mb
-      region: oregon
+      # Same region as the Neon database (AWS us-east-1, N. Virginia); every
+      # query crosses this link, so keep the API and database co-located.
+      region: virginia
       buildCommand: npm ci --include=dev && npm run build
       startCommand: npm start
       preDeployCommand: npm run db:migrate

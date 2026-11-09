@@ -86,7 +86,7 @@ Migrations live in `server/migrations` and are generated from `server/src/db/sch
 
 Production uses [Neon](https://neon.tech) serverless Postgres (free tier) for the database and a Render Web Service for the API (`render.yaml`). Local development still uses Docker Postgres; nothing changes there.
 
-1. **Create the database.** Sign up at neon.tech and create a project, choosing a region close to the Render service (e.g. AWS US West for Render's `oregon`). On the project dashboard, click **Connect** and copy the connection string. Use the **direct** string (pooling toggle off): the API keeps its own small connection pool, so Neon's pooler isn't needed.
+1. **Create the database.** Sign up at neon.tech and create a project, in the same region as the Render service: currently AWS US East 1 (N. Virginia) for Neon and `virginia` for Render. Each request makes several sequential queries, so a cross-country API↔database link adds hundreds of milliseconds. On the project dashboard, click **Connect** and copy the connection string. Use the **direct** string (pooling toggle off): the API keeps its own small connection pool, so Neon's pooler isn't needed.
 2. **Make the URL verify TLS.** Replace the `sslmode=require` at the end of the copied URL with `sslmode=verify-full`. (node-postgres treats `require` as `verify-full` anyway and prints a security warning about it.)
    ```text
    postgresql://USER:PASSWORD@ep-xxx.us-west-2.aws.neon.tech/neondb?sslmode=verify-full
