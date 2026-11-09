@@ -1,4 +1,6 @@
 # Exported from Render on 2026-09-15T16:22:17Z
+# Database: Neon serverless Postgres (not a Render database). Set DATABASE_URL
+# in the Render dashboard to the Neon connection string; see README.
 version: "1"
 projects:
 - name: My project
@@ -17,3 +19,13 @@ projects:
       healthCheckPath: /api/health
       autoDeployTrigger: commit
       rootDir: server
+      envVars:
+      - key: NODE_ENV
+        value: production
+      # Neon connection string, e.g.
+      # postgresql://USER:PASSWORD@ep-xxx.us-west-2.aws.neon.tech/neondb?sslmode=verify-full
+      - key: DATABASE_URL
+        sync: false
+      # The deployed frontend's origin, e.g. https://your-site.netlify.app
+      - key: CORS_ORIGIN
+        sync: false

@@ -3,9 +3,7 @@
 
 export type ID = string;
 
-export type CatalogItemType = "asset" | "consumable" | "accessory" | "software";
-
-export type AssetStatus = "active" | "in_storage" | "under_repair" | "retired";
+export type CatalogItemType = "consumable" | "accessory";
 
 export type PurchaseOrderStatus = "open" | "received" | "cancelled";
 
@@ -17,17 +15,6 @@ export type InventoryTransactionType =
   | "adjustment"
   | "disposal";
 
-export type LicenseType = "subscription" | "perpetual" | "volume";
-
-export type AssetEventType =
-  | "purchased"
-  | "assigned"
-  | "returned"
-  | "moved"
-  | "repair_started"
-  | "repair_completed"
-  | "retired";
-
 export interface CatalogItem {
   id: ID;
   name: string;
@@ -37,22 +24,7 @@ export interface CatalogItem {
   model?: string;
   vendorId?: ID;
   reorderPoint?: number;
-  lifecycleMonths?: number;
   unitPrice?: number;
-}
-
-export interface Asset {
-  id: ID;
-  catalogItemId: ID;
-  assetTag: string;
-  serialNumber: string;
-  status: AssetStatus;
-  purchaseOrderId?: ID;
-  purchaseDate?: string;
-  warrantyEndDate?: string;
-  locationId: ID;
-  assignedUserId?: ID;
-  notes?: string;
 }
 
 export interface StockItem {
@@ -70,7 +42,6 @@ export interface InventoryTransaction {
   type: InventoryTransactionType;
   quantity: number;
   performedByUserId: ID;
-  relatedAssetId?: ID;
   relatedPurchaseOrderId?: ID;
   createdAt: string;
   notes?: string;
@@ -125,39 +96,8 @@ export interface PurchaseOrderLine {
   receivedQuantity: number;
 }
 
-export interface SoftwareLicense {
-  id: ID;
-  catalogItemId: ID;
-  licenseType: LicenseType;
-  totalSeats: number;
-  renewalDate?: string;
-  vendorId?: ID;
-}
-
-export interface SoftwareAssignment {
-  id: ID;
-  softwareLicenseId: ID;
-  userId?: ID;
-  assetId?: ID;
-  assignedAt: string;
-  revokedAt?: string;
-}
-
-export interface AssetEvent {
-  id: ID;
-  assetId: ID;
-  type: AssetEventType;
-  fromUserId?: ID;
-  toUserId?: ID;
-  fromLocationId?: ID;
-  toLocationId?: ID;
-  createdAt: string;
-  notes?: string;
-}
-
 export interface AppData {
   catalogItems: Record<ID, CatalogItem>;
-  assets: Record<ID, Asset>;
   stockItems: Record<ID, StockItem>;
   inventoryTransactions: Record<ID, InventoryTransaction>;
   users: Record<ID, User>;
@@ -166,7 +106,4 @@ export interface AppData {
   vendors: Record<ID, Vendor>;
   purchaseOrders: Record<ID, PurchaseOrder>;
   purchaseOrderLines: Record<ID, PurchaseOrderLine>;
-  softwareLicenses: Record<ID, SoftwareLicense>;
-  softwareAssignments: Record<ID, SoftwareAssignment>;
-  assetEvents: Record<ID, AssetEvent>;
 }

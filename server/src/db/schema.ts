@@ -82,17 +82,15 @@ export const catalogItems = pgTable(
     model: text("model"),
     vendorId: uuid("vendor_id").references(() => vendors.id, { onDelete: "set null" }),
     reorderPoint: integer("reorder_point"),
-    lifecycleMonths: integer("lifecycle_months"),
     unitPrice: numeric("unit_price", { precision: 12, scale: 2 }),
     ...timestamps,
   },
   (table) => [
     check(
       "catalog_items_type_check",
-      sql`${table.type} IN ('asset', 'consumable', 'accessory', 'software')`
+      sql`${table.type} IN ('consumable', 'accessory')`
     ),
     check("catalog_items_reorder_point_check", sql`${table.reorderPoint} >= 0`),
-    check("catalog_items_lifecycle_months_check", sql`${table.lifecycleMonths} > 0`),
   ]
 );
 
@@ -138,38 +136,6 @@ export const purchaseOrderLines = pgTable(
   ]
 );
 
-export const assets = pgTable(
-  "assets",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    catalogItemId: uuid("catalog_item_id")
-      .notNull()
-      .references(() => catalogItems.id),
-    assetTag: text("asset_tag").notNull().unique(),
-    serialNumber: text("serial_number").notNull().unique(),
-    status: text("status").notNull(),
-    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id, { onDelete: "set null" }),
-    purchaseDate: date("purchase_date"),
-    warrantyEndDate: date("warranty_end_date"),
-    locationId: uuid("location_id")
-      .notNull()
-      .references(() => locations.id),
-    assignedUserId: uuid("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
-    notes: text("notes"),
-    ...timestamps,
-  },
-  (table) => [
-    check(
-      "assets_status_check",
-      sql`${table.status} IN ('active', 'in_storage', 'under_repair', 'retired')`
-    ),
-    index("assets_catalog_item_id_idx").on(table.catalogItemId),
-    index("assets_location_id_idx").on(table.locationId),
-    index("assets_assigned_user_id_idx").on(table.assignedUserId),
-    index("assets_status_idx").on(table.status),
-  ]
-);
-
 export const stockItems = pgTable(
   "stock_items",
   {
@@ -207,7 +173,6 @@ export const inventoryTransactions = pgTable(
     performedByUserId: uuid("performed_by_user_id")
       .notNull()
       .references(() => users.id),
-    relatedAssetId: uuid("related_asset_id").references(() => assets.id, { onDelete: "set null" }),
     relatedPurchaseOrderId: uuid("related_purchase_order_id").references(() => purchaseOrders.id, {
       onDelete: "set null",
     }),
@@ -222,74 +187,5 @@ export const inventoryTransactions = pgTable(
     check("inventory_transactions_quantity_check", sql`${table.quantity} > 0`),
     index("inventory_transactions_catalog_location_idx").on(table.catalogItemId, table.locationId),
     index("inventory_transactions_created_at_idx").on(table.createdAt),
-  ]
-);
-
-export const softwareLicenses = pgTable(
-  "software_licenses",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    catalogItemId: uuid("catalog_item_id")
-      .notNull()
-      .references(() => catalogItems.id),
-    licenseType: text("license_type").notNull(),
-    totalSeats: integer("total_seats").notNull(),
-    renewalDate: date("renewal_date"),
-    vendorId: uuid("vendor_id").references(() => vendors.id, { onDelete: "set null" }),
-    ...timestamps,
-  },
-  (table) => [
-    check(
-      "software_licenses_license_type_check",
-      sql`${table.licenseType} IN ('subscription', 'perpetual', 'volume')`
-    ),
-    check("software_licenses_total_seats_check", sql`${table.totalSeats} >= 0`),
-  ]
-);
-
-export const softwareAssignments = pgTable(
-  "software_assignments",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    softwareLicenseId: uuid("software_license_id")
-      .notNull()
-      .references(() => softwareLicenses.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    assetId: uuid("asset_id").references(() => assets.id, { onDelete: "cascade" }),
-    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
-    revokedAt: timestamp("revoked_at", { withTimezone: true }),
-  },
-  (table) => [
-    check(
-      "software_assignments_user_or_asset_check",
-      sql`${table.userId} IS NOT NULL OR ${table.assetId} IS NOT NULL`
-    ),
-    index("software_assignments_active_idx")
-      .on(table.softwareLicenseId)
-      .where(sql`${table.revokedAt} IS NULL`),
-  ]
-);
-
-export const assetEvents = pgTable(
-  "asset_events",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    assetId: uuid("asset_id")
-      .notNull()
-      .references(() => assets.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    fromUserId: uuid("from_user_id").references(() => users.id, { onDelete: "set null" }),
-    toUserId: uuid("to_user_id").references(() => users.id, { onDelete: "set null" }),
-    fromLocationId: uuid("from_location_id").references(() => locations.id, { onDelete: "set null" }),
-    toLocationId: uuid("to_location_id").references(() => locations.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    notes: text("notes"),
-  },
-  (table) => [
-    check(
-      "asset_events_type_check",
-      sql`${table.type} IN ('purchased', 'assigned', 'returned', 'moved', 'repair_started', 'repair_completed', 'retired')`
-    ),
-    index("asset_events_asset_id_created_at_idx").on(table.assetId, table.createdAt),
   ]
 );

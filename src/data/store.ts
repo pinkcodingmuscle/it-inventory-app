@@ -7,7 +7,6 @@ import type { AppData } from "../types/domain";
 // re-renders after a refresh.
 export const appData: AppData = {
   catalogItems: {},
-  assets: {},
   stockItems: {},
   inventoryTransactions: {},
   users: {},
@@ -16,9 +15,6 @@ export const appData: AppData = {
   vendors: {},
   purchaseOrders: {},
   purchaseOrderLines: {},
-  softwareLicenses: {},
-  softwareAssignments: {},
-  assetEvents: {},
 };
 
 export function setAppData(next: AppData): void {

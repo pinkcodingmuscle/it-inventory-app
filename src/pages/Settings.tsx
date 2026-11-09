@@ -12,15 +12,8 @@ export default function Settings() {
   const [defaultLocation, setDefaultLocation] = useState("IT Storage");
   const [currency, setCurrency] = useState("USD");
 
-  const [laptopCycle, setLaptopCycle] = useState(3);
-  const [desktopCycle, setDesktopCycle] = useState(3);
-  const [lifecycleWarning, setLifecycleWarning] = useState(90);
-
   const [lowStockAlerts, setLowStockAlerts] = useState(true);
   const [lowStockThreshold, setLowStockThreshold] = useState(3);
-
-  const [expirationAlerts, setExpirationAlerts] = useState(true);
-  const [expirationWarning, setExpirationWarning] = useState(30);
 
   const categories = useMemo(
     () => Array.from(new Set(Object.values(appData.catalogItems).map((c) => c.category))),
@@ -37,13 +30,8 @@ export default function Settings() {
       organizationName,
       defaultLocation,
       currency,
-      laptopCycle,
-      desktopCycle,
-      lifecycleWarning,
       lowStockAlerts,
       lowStockThreshold,
-      expirationAlerts,
-      expirationWarning,
     });
   }
 
@@ -52,7 +40,7 @@ export default function Settings() {
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">
-          Manage inventory preferences, lifecycle rules, and notifications.
+          Manage inventory preferences and notifications.
         </p>
       </div>
 
@@ -110,74 +98,6 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* Asset Lifecycle */}
-        <section className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Asset Lifecycle
-          </h2>
-
-          <div className="mt-6 space-y-5">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Laptop replacement cycle
-              </label>
-
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={laptopCycle}
-                  onChange={(e) => setLaptopCycle(Number(e.target.value))}
-                  className="w-24 rounded-lg border border-gray-300 px-4 py-2.5"
-                />
-
-                <span className="text-sm text-gray-500">years</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Desktop replacement cycle
-              </label>
-
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={desktopCycle}
-                  onChange={(e) => setDesktopCycle(Number(e.target.value))}
-                  className="w-24 rounded-lg border border-gray-300 px-4 py-2.5"
-                />
-
-                <span className="text-sm text-gray-500">years</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Lifecycle warning
-              </label>
-
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">
-                  Notify when asset is within
-                </span>
-
-                <input
-                  type="number"
-                  value={lifecycleWarning}
-                  onChange={(e) =>
-                    setLifecycleWarning(Number(e.target.value))
-                  }
-                  className="w-24 rounded-lg border border-gray-300 px-4 py-2.5"
-                />
-
-                <span className="text-sm text-gray-500">
-                  days of replacement
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* Inventory Alerts */}
         <section className="rounded-xl border border-gray-200 bg-white p-6">
           <h2 className="text-lg font-semibold text-gray-900">
@@ -214,40 +134,6 @@ export default function Settings() {
                 />
 
                 <span className="text-sm text-gray-500">units</span>
-              </div>
-            </div>
-
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={expirationAlerts}
-                onChange={(e) => setExpirationAlerts(e.target.checked)}
-                className="h-4 w-4"
-              />
-
-              <span className="text-sm font-medium text-gray-700">
-                Enable expiration alerts
-              </span>
-            </label>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Expiration warning
-              </label>
-
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={expirationWarning}
-                  onChange={(e) =>
-                    setExpirationWarning(Number(e.target.value))
-                  }
-                  className="w-24 rounded-lg border border-gray-300 px-4 py-2.5"
-                />
-
-                <span className="text-sm text-gray-500">
-                  days before expiration
-                </span>
               </div>
             </div>
           </div>

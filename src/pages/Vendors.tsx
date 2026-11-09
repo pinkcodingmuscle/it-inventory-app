@@ -54,7 +54,7 @@ export default function Vendors() {
               <th className="px-6 py-3 text-left">Contact</th>
               <th className="px-6 py-3 text-left">Email</th>
               <th className="px-6 py-3 text-left">Phone</th>
-              <th className="px-6 py-3 text-left">Assets Supplied</th>
+              <th className="px-6 py-3 text-left">Items Supplied</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

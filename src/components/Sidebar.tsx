@@ -3,31 +3,23 @@ import { useState } from "react";
 import { Menu, CircleHelp } from "lucide-react";
 import {
   LayoutDashboard,
-  Laptop,
   Package,
   Trash2,
-  Monitor,
   ShoppingCart,
   Building2,
-  Users,
   MapPin,
   BarChart3,
-  Recycle,
   Settings,
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard",   path: "/",           icon: LayoutDashboard },
-  { name: "Assets",      path: "/assets",      icon: Laptop          },
   { name: "Inventory",   path: "/inventory",   icon: Package         },
   { name: "Consumables", path: "/consumables", icon: Trash2          },
-  { name: "Software",    path: "/software",    icon: Monitor         },
   { name: "Purchases",   path: "/purchases",   icon: ShoppingCart    },
   { name: "Vendors",     path: "/vendors",     icon: Building2       },
-  { name: "Users",       path: "/users",       icon: Users           },
   { name: "Locations",   path: "/locations",   icon: MapPin          },
   { name: "Reports",     path: "/reports",     icon: BarChart3       },
-  { name: "Lifecycle",   path: "/lifecycle",   icon: Recycle },
   { name: "Settings",    path: "/settings",    icon: Settings        },
 ];
 
@@ -58,7 +50,7 @@ export default function Sidebar() {
           {/* App name */}
           {/* * Hidden when collapsed so the toggle button stays aligned right */}
           {!collapsed && (
-            <span className="text-base font-semibold"> IT Asset Manager </span>
+            <span className="text-base font-semibold"> IT Inventory </span>
           )}
         </div>
 

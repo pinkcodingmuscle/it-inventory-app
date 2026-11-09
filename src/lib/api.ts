@@ -1,15 +1,11 @@
 import type {
   AppData,
-  Asset,
-  AssetEvent,
   CatalogItem,
   Department,
   InventoryTransaction,
   Location,
   PurchaseOrder,
   PurchaseOrderLine,
-  SoftwareAssignment,
-  SoftwareLicense,
   StockItem,
   User,
   Vendor,
@@ -38,26 +34,18 @@ export async function fetchAppData(): Promise<AppData> {
     locations,
     vendors,
     catalogItems,
-    assets,
     stockItems,
     purchaseOrderData,
-    softwareLicenses,
-    softwareAssignments,
     inventoryTransactions,
-    assetEvents,
   ] = await Promise.all([
     apiFetch<Department[]>("/departments"),
     apiFetch<User[]>("/users"),
     apiFetch<Location[]>("/locations"),
     apiFetch<Vendor[]>("/vendors"),
     apiFetch<CatalogItem[]>("/catalog-items"),
-    apiFetch<Asset[]>("/assets"),
     apiFetch<StockItem[]>("/stock"),
     apiFetch<{ purchaseOrders: PurchaseOrder[]; purchaseOrderLines: PurchaseOrderLine[] }>("/purchase-orders"),
-    apiFetch<SoftwareLicense[]>("/software-licenses"),
-    apiFetch<SoftwareAssignment[]>("/software-assignments"),
     apiFetch<InventoryTransaction[]>("/inventory-transactions"),
-    apiFetch<AssetEvent[]>("/asset-events"),
   ]);
 
   return {
@@ -66,14 +54,10 @@ export async function fetchAppData(): Promise<AppData> {
     locations: byId(locations),
     vendors: byId(vendors),
     catalogItems: byId(catalogItems),
-    assets: byId(assets),
     stockItems: byId(stockItems),
     purchaseOrders: byId(purchaseOrderData.purchaseOrders),
     purchaseOrderLines: byId(purchaseOrderData.purchaseOrderLines),
-    softwareLicenses: byId(softwareLicenses),
-    softwareAssignments: byId(softwareAssignments),
     inventoryTransactions: byId(inventoryTransactions),
-    assetEvents: byId(assetEvents),
   };
 }
 

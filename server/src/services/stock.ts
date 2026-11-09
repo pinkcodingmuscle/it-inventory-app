@@ -28,7 +28,7 @@ export async function checkoutStock(
   stockItemId: string,
   quantity: number,
   performedByUserId: string,
-  opts: { relatedAssetId?: string; notes?: string } = {}
+  opts: { notes?: string } = {}
 ) {
   if (quantity <= 0) throw new BadRequestError("Checkout quantity must be greater than zero.");
 
@@ -50,7 +50,6 @@ export async function checkoutStock(
         type: "checkout",
         quantity,
         performedByUserId,
-        relatedAssetId: opts.relatedAssetId,
         notes: opts.notes,
       })
       .returning();
@@ -63,7 +62,7 @@ export async function returnStock(
   stockItemId: string,
   quantity: number,
   performedByUserId: string,
-  opts: { relatedAssetId?: string; notes?: string } = {}
+  opts: { notes?: string } = {}
 ) {
   if (quantity <= 0) throw new BadRequestError("Return quantity must be greater than zero.");
 
@@ -84,7 +83,6 @@ export async function returnStock(
         type: "return",
         quantity,
         performedByUserId,
-        relatedAssetId: opts.relatedAssetId,
         notes: opts.notes,
       })
       .returning();

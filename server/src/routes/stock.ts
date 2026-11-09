@@ -18,7 +18,6 @@ stockRouter.get(
 
 const checkoutSchema = z.object({
   quantity: z.number().int().positive(),
-  relatedAssetId: z.string().uuid().optional(),
   notes: z.string().optional(),
 });
 

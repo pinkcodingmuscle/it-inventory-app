@@ -1,5 +1,7 @@
 # IT Inventory Application
 
+Tracks IT inventory: stockable accessories and consumables (cables, docks, toner, peripherals, batteries), their quantities by location, checkouts/returns/adjustments, vendors, and purchase orders. Individually tracked assets (laptops, desktops), end users, and software licenses are intentionally out of scope; their lifecycle is managed in a separate system.
+
 A React + TypeScript frontend backed by an Express API and a PostgreSQL database, following [docs/data-structure-proposal.md](docs/data-structure-proposal.md) for the domain model and [docs/database-persistence-proposal.md](docs/database-persistence-proposal.md) for the persistence architecture.
 
 ```text
@@ -19,7 +21,7 @@ npm run db:up
 
 # 2. Install and configure the API server
 npm run server:install
-cp server/.env.example server/.env
+# then create .env in the project root (see "Environment variables" below)
 
 # 3. Create the schema and load development data
 npm run db:migrate
@@ -27,6 +29,24 @@ npm run db:seed
 
 # 4. Install frontend dependencies
 npm install
+```
+
+## Environment variables
+
+All configuration lives in a single `.env` at the project root, shared by the API server, the frontend and docker compose. It is gitignored; create it with:
+
+```bash
+# Server (API + database)
+POSTGRES_PASSWORD=local_development_password
+DATABASE_URL=postgresql://inventory_app:local_development_password@localhost:5432/it_inventory
+PORT=4000
+# Optional: pin CORS to a single origin (e.g. in production). If unset, any
+# http://localhost:<port> origin is allowed, since Vite picks the next free
+# port when 5173 is taken.
+# CORS_ORIGIN=http://localhost:5173
+
+# Frontend (Vite; only VITE_* vars are exposed to the browser)
+# VITE_API_URL=http://localhost:4000/api
 ```
 
 ## Running the app
@@ -38,7 +58,7 @@ npm run server:dev   # API on http://localhost:4000
 npm run dev          # Frontend on http://localhost:5173 (or next free port)
 ```
 
-The frontend reads `VITE_API_URL` (default `http://localhost:4000/api`); set it in a `.env.local` file if the API runs elsewhere.
+The frontend reads `VITE_API_URL` (default `http://localhost:4000/api`); set it in the root `.env` if the API runs elsewhere.
 
 ## Everyday database commands
 
@@ -52,17 +72,48 @@ npm run db:import -- /absolute/path/to/inventory.xlsx --dry-run  # preview a rea
 npm run db:import -- /absolute/path/to/inventory.xlsx --replace   # replace development data after validation and backup
 ```
 
+The importer loads stock rows only; rows with an asset tag or serial number are skipped and counted as `skippedSerializedRows` in the summary.
+
 Migrations live in `server/migrations` and are generated from `server/src/db/schema.ts` via Drizzle Kit (`npm --prefix server run db:generate` after changing the schema).
 
 ## Project layout
 
 - `src/` — React frontend. Pages render data from `src/lib/selectors.ts`, which reads a client-side cache (`src/data/store.ts`) populated by `DataProvider` (`src/context/DataContext.tsx`) from the API (`src/lib/api.ts`).
-- `server/` — Express API, Drizzle ORM schema/migrations, and the transactional business logic for stock, purchase orders, assets, and software licensing described in section 9 of the persistence proposal.
+- `server/` — Express API, Drizzle ORM schema/migrations, and the transactional business logic for stock and purchase orders described in section 9 of the persistence proposal.
 - `docker-compose.yml` — local PostgreSQL 16 with a named volume.
+
+## Deployment (Render API + Neon Postgres)
+
+Production uses [Neon](https://neon.tech) serverless Postgres (free tier) for the database and a Render Web Service for the API (`render.yaml`). Local development still uses Docker Postgres; nothing changes there.
+
+1. **Create the database.** Sign up at neon.tech and create a project, choosing a region close to the Render service (e.g. AWS US West for Render's `oregon`). On the project dashboard, click **Connect** and copy the connection string. Use the **direct** string (pooling toggle off): the API keeps its own small connection pool, so Neon's pooler isn't needed.
+2. **Make the URL verify TLS.** Replace the `sslmode=require` at the end of the copied URL with `sslmode=verify-full`. (node-postgres treats `require` as `verify-full` anyway and prints a security warning about it.)
+   ```text
+   postgresql://USER:PASSWORD@ep-xxx.us-west-2.aws.neon.tech/neondb?sslmode=verify-full
+   ```
+3. **Point Render at it.** In the Render dashboard, set the service's `DATABASE_URL` to that string. Also set `CORS_ORIGIN` to the frontend's URL, and `NODE_ENV=production`. On the next deploy, the `preDeployCommand` (`npm run db:migrate`) creates the schema in Neon.
+4. **Load data** (pick one, run from your machine):
+   ```bash
+   # Fresh development dataset
+   DATABASE_URL='<neon url>' npm run db:seed
+   # Real workbook
+   DATABASE_URL='<neon url>' npm run db:import -- /absolute/path/to/inventory.xlsx --replace
+   # Or copy an existing database (e.g. a previous Render Postgres)
+   pg_dump --no-owner --no-acl -Fc '<old url>' -f inventory.dump
+   pg_restore --no-owner --no-acl -d '<neon url>' inventory.dump
+   ```
+   An exported `DATABASE_URL` overrides the one in `.env`.
+5. **Frontend.** Build it with `VITE_API_URL=https://<render-service>.onrender.com/api` (set it in Netlify's environment variables).
+
+Notes:
+- If `DATABASE_URL` points anywhere other than localhost and has no `sslmode`, the API requires TLS anyway (`server/src/db/client.ts`).
+- Neon's free compute suspends after a few minutes idle; the first query afterwards takes roughly a second while it wakes. `/api/health` deliberately doesn't touch the database, so Render's health checks don't keep it awake and use up the free compute hours.
+- Neon's free tier keeps only a short restore history. For business data, take regular `pg_dump` backups as well.
+- Tests never use the Neon URL unless you point them at it: they read `TEST_DATABASE_URL` first, then fall back to a local test database.
 
 ## Authorization stub
 
-There is no login flow yet. Requests identify the acting user via an `x-user-id` header (or fall back to a seeded administrator), and that user's job-title `role` is mapped onto one of four permission tiers (administrator / inventory manager / technician / read-only) from section 10 of the persistence proposal. See `server/src/middleware/auth.ts` — this is a development placeholder, not real authentication, and should be replaced before this ever handles production data.
+There is no login flow yet. The `users` table holds the IT staff who operate the system (for permissions and the transaction audit trail), not tracked end users. Requests identify the acting user via an `x-user-id` header (or fall back to a seeded administrator), and that user's job-title `role` is mapped onto one of four permission tiers (administrator / inventory manager / technician / read-only) from section 10 of the persistence proposal. See `server/src/middleware/auth.ts` — this is a development placeholder, not real authentication, and should be replaced before this ever handles production data.
 
 ## Tests
 

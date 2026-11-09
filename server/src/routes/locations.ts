@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { assets, locations, stockItems } from "../db/schema.js";
+import { locations, stockItems } from "../db/schema.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { ConflictError, NotFoundError } from "../lib/errors.js";
 import { requirePermission } from "../middleware/auth.js";
@@ -51,15 +51,13 @@ locationsRouter.patch(
   })
 );
 
-// Locations must not be deleted while assets or stock remain assigned to
-// them (section 11 of the persistence proposal).
+// Locations must not be deleted while stock remains assigned to them
+// (section 11 of the persistence proposal).
 locationsRouter.delete(
   "/:id",
   requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const locationId = req.params.id;
-    const [assetAtLocation] = await db.select({ id: assets.id }).from(assets).where(eq(assets.locationId, locationId)).limit(1);
-    if (assetAtLocation) throw new ConflictError("Cannot delete a location that still has assets assigned to it.");
     const [stockAtLocation] = await db
       .select({ id: stockItems.id })
       .from(stockItems)

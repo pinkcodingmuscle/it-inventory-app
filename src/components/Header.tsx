@@ -3,22 +3,18 @@ import { useLocation } from "react-router-dom";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
-  "/assets": "Assets",
   "/inventory": "Inventory",
   "/consumables": "Consumables",
-  "/software": "Software",
   "/purchases": "Purchases",
   "/vendors": "Vendors",
-  "/users": "Users",
   "/locations": "Locations",
   "/reports": "Reports",
-  "/lifecycle": "Lifecycle",
   "/settings": "Settings",
 };
 
 export default function Header() {
   const location = useLocation();
-  const title = pageTitles[location.pathname] ?? "IT Asset Manager";
+  const title = pageTitles[location.pathname] ?? "IT Inventory";
   const notificationCount = 5;
   return (
     <header className="flex h-20 items-center justify-between border-b bg-white px-8">
@@ -44,7 +40,7 @@ export default function Header() {
 
           <input
             type="text"
-            placeholder="Search assets, inventory, users, or anything..."
+            placeholder="Search inventory, purchases, vendors, or anything..."
             className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
           />
 

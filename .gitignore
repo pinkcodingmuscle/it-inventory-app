@@ -15,7 +15,6 @@ dist-ssr
 # Environment files (never commit real credentials)
 .env
 .env.*
-!.env.example
 
 # Editor directories and files
 .vscode/*
@@ -28,15 +27,5 @@ dist-ssr
 *.sln
 *.sw?
 
-# Confidential inventory workbooks
+# Confidential inventory workbooks (contains real, non-public inventory data)
 src/data/IT Inventory Workbook.xlsx
-docs/data-structure-proposal.md
-.gitignore
-.gitignore
-docs/ninjaone-integration-proposal.md
-docs/excel-import-proposal.md
-docs/database-persistence-proposal.md
-src/data/IT Inventory Workbook.xlsx
-server/.env.example
-docker-compose.yml
-docs/low-cost-business-deployment-proposal.md

@@ -2,28 +2,22 @@ import { BarChart3, FileText, Download } from "lucide-react";
 
 const reports = [
   {
-    name: "Asset Inventory Report",
-    description: "Full list of all assets with serial numbers, assignments, and current status.",
-    icon: FileText,
-    tag: "Assets",
-  },
-  {
-    name: "Lifecycle & Replacement Report",
-    description: "Assets approaching or past their replacement due date, grouped by status.",
-    icon: BarChart3,
-    tag: "Lifecycle",
-  },
-  {
-    name: "Low Stock Report",
-    description: "Consumable items below their reorder threshold with current stock levels.",
+    name: "Stock On Hand Report",
+    description: "Every inventory item with total, available, and checked-out quantities by location.",
     icon: FileText,
     tag: "Inventory",
   },
   {
-    name: "Software License Expiry Report",
-    description: "Software licenses expiring within 90 days with seat utilization.",
+    name: "Low Stock Report",
+    description: "Items at or below their reorder threshold with current stock levels.",
+    icon: BarChart3,
+    tag: "Inventory",
+  },
+  {
+    name: "Stock Movement Report",
+    description: "Receipts, checkouts, returns, and adjustments within a date range, with who performed them.",
     icon: FileText,
-    tag: "Software",
+    tag: "Transactions",
   },
   {
     name: "Purchase History Report",
@@ -31,21 +25,12 @@ const reports = [
     icon: FileText,
     tag: "Purchases",
   },
-  {
-    name: "User Asset Assignment Report",
-    description: "Per-user breakdown of assigned assets and their lifecycle status.",
-    icon: FileText,
-    tag: "Users",
-  },
 ];
 
 const tagColors: Record<string, string> = {
-  Assets:    "bg-blue-100 text-blue-700",
-  Lifecycle: "bg-amber-100 text-amber-700",
-  Inventory: "bg-purple-100 text-purple-700",
-  Software:  "bg-green-100 text-green-700",
-  Purchases: "bg-indigo-100 text-indigo-700",
-  Users:     "bg-pink-100 text-pink-700",
+  Inventory:    "bg-purple-100 text-purple-700",
+  Transactions: "bg-amber-100 text-amber-700",
+  Purchases:    "bg-indigo-100 text-indigo-700",
 };
 
 export default function Reports() {

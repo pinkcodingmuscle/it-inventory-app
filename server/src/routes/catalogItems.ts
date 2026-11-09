@@ -25,12 +25,11 @@ catalogItemsRouter.get(
 const createSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
-  type: z.enum(["asset", "consumable", "accessory", "software"]),
+  type: z.enum(["consumable", "accessory"]),
   manufacturer: z.string().optional(),
   model: z.string().optional(),
   vendorId: z.string().uuid().optional(),
   reorderPoint: z.number().int().min(0).optional(),
-  lifecycleMonths: z.number().int().positive().optional(),
   unitPrice: z.number().min(0).optional(),
 });
 

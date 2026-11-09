@@ -2,7 +2,6 @@ import XLSX from "xlsx";
 import { sql } from "drizzle-orm";
 import { db, pool } from "../db/client.js";
 import {
-  assets,
   catalogItems,
   departments,
   inventoryTransactions,
@@ -18,17 +17,9 @@ interface ImportRow {
   itemName: string;
   category: string;
   itemType?: string;
-  assetTag?: string;
-  serialNumber?: string;
   quantity: number;
-  assignedUser?: string;
-  userEmail?: string;
-  department?: string;
   location: string;
   vendor?: string;
-  status?: string;
-  purchaseDate?: string;
-  warrantyEndDate?: string;
   reorderPoint?: number;
   notes?: string;
 }
@@ -42,30 +33,24 @@ export interface ImportOptions {
 
 export interface ImportSummary {
   rows: number;
-  assets: number;
+  /** Rows with an asset tag or serial number: individually tracked assets are out of scope, so they are not imported. */
+  skippedSerializedRows: number;
   stockItems: number;
-  users: number;
   locations: number;
   vendors: number;
   catalogItems: number;
   errors: string[];
 }
 
+const serializedHeaders = ["asset tag", "tag", "inventory number", "inventory tag", "serial number", "serial", "s/n", "sn"];
+
 const aliases: Record<keyof Omit<ImportRow, "rowNumber" | "quantity" | "reorderPoint">, string[]> = {
   sourceId: ["assetid", "asset id", "source id", "inventory id"],
   itemName: ["item name", "product", "description", "model", "item"],
   category: ["category", "asset type", "group"],
   itemType: ["item type", "catalog type", "record type"],
-  assetTag: ["asset tag", "tag", "inventory number", "inventory tag"],
-  serialNumber: ["serial number", "serial", "s/n", "sn"],
-  assignedUser: ["assigned to", "assigned user", "user", "employee", "assignee"],
-  userEmail: ["user email", "assigned email", "email"],
-  department: ["department", "dept"],
   location: ["location", "site", "office", "storage location"],
   vendor: ["vendor", "supplier", "manufacturer"],
-  status: ["status", "asset status", "condition"],
-  purchaseDate: ["purchase date", "purchased", "acquired"],
-  warrantyEndDate: ["warranty end", "warranty expiration", "warranty end date"],
   notes: ["notes", "comments", "comment"],
 };
 
@@ -93,20 +78,12 @@ function inferCategory(itemName: string): string {
   return "Other";
 }
 
-function dateValue(value: unknown): string | undefined {
-  if (value instanceof Date && !Number.isNaN(value.valueOf())) return value.toISOString().slice(0, 10);
-  const result = text(value);
-  if (!result) return undefined;
-  const date = new Date(result);
-  return Number.isNaN(date.valueOf()) ? result : date.toISOString().slice(0, 10);
-}
-
 function valueFor(raw: Record<string, unknown>, headers: Record<string, string>, names: string[]): unknown {
   const header = Object.entries(headers).find(([, normalized]) => names.includes(normalized))?.[0];
   return header ? raw[header] : undefined;
 }
 
-function parseRows(filePath: string, sheetName?: string): { rows: ImportRow[]; errors: string[] } {
+function parseRows(filePath: string, sheetName?: string): { rows: ImportRow[]; skippedSerializedRows: number; errors: string[] } {
   const workbook = XLSX.readFile(filePath, { cellDates: true });
   const selectedSheet = sheetName ?? workbook.SheetNames[0];
   if (!selectedSheet || !workbook.Sheets[selectedSheet]) {
@@ -115,7 +92,8 @@ function parseRows(filePath: string, sheetName?: string): { rows: ImportRow[]; e
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[selectedSheet], { defval: "" });
   const errors: string[] = [];
   const rows: ImportRow[] = [];
-  if (rawRows.length === 0) return { rows, errors: ["The selected worksheet contains no data rows."] };
+  let skippedSerializedRows = 0;
+  if (rawRows.length === 0) return { rows, skippedSerializedRows, errors: ["The selected worksheet contains no data rows."] };
 
   const headers = Object.fromEntries(Object.keys(rawRows[0]).map((header) => [header, normalizeHeader(header)]));
   const quantityHeaders = ["quantity", "qty", "count", "on hand", "onhand", "stock"];
@@ -123,19 +101,20 @@ function parseRows(filePath: string, sheetName?: string): { rows: ImportRow[]; e
 
   rawRows.forEach((raw, index) => {
     const rowNumber = index + 2;
+    if (text(valueFor(raw, headers, serializedHeaders))) {
+      skippedSerializedRows++;
+      return;
+    }
     const itemName = text(valueFor(raw, headers, aliases.itemName));
     const category = text(valueFor(raw, headers, aliases.category)) ?? (itemName ? inferCategory(itemName) : undefined);
     const location = text(valueFor(raw, headers, aliases.location));
-    const assetTag = text(valueFor(raw, headers, aliases.assetTag));
-    const serialNumber = text(valueFor(raw, headers, aliases.serialNumber));
-    const quantity = numberValue(valueFor(raw, headers, quantityHeaders), assetTag || serialNumber ? 1 : undefined);
+    const quantity = numberValue(valueFor(raw, headers, quantityHeaders));
     const reorderPoint = numberValue(valueFor(raw, headers, reorderHeaders));
     const rowErrors: string[] = [];
     if (!itemName) rowErrors.push("item name is required");
     if (!category) rowErrors.push("category is required");
     if (!location) rowErrors.push("location is required");
     if (quantity === undefined || !Number.isInteger(quantity) || quantity < 0) rowErrors.push("quantity must be a whole number >= 0");
-    if ((assetTag || serialNumber) && (!assetTag || !serialNumber)) rowErrors.push("serialized rows require both asset tag and serial number");
     if (reorderPoint !== undefined && (!Number.isInteger(reorderPoint) || reorderPoint < 0)) rowErrors.push("reorder point must be a whole number >= 0");
     if (rowErrors.length) {
       errors.push(`Row ${rowNumber}: ${rowErrors.join(", ")}`);
@@ -147,48 +126,30 @@ function parseRows(filePath: string, sheetName?: string): { rows: ImportRow[]; e
       itemName: itemName!,
       category: category!,
       itemType: text(valueFor(raw, headers, aliases.itemType)),
-      assetTag,
-      serialNumber,
       quantity: quantity!,
-      assignedUser: text(valueFor(raw, headers, aliases.assignedUser)),
-      userEmail: text(valueFor(raw, headers, aliases.userEmail)),
-      department: text(valueFor(raw, headers, aliases.department)),
       location: location!,
       vendor: text(valueFor(raw, headers, aliases.vendor)),
-      status: text(valueFor(raw, headers, aliases.status)),
-      purchaseDate: dateValue(valueFor(raw, headers, aliases.purchaseDate)),
-      warrantyEndDate: dateValue(valueFor(raw, headers, aliases.warrantyEndDate)),
       reorderPoint,
       notes: text(valueFor(raw, headers, aliases.notes)),
     });
   });
-  return { rows, errors };
+  return { rows, skippedSerializedRows, errors };
 }
 
 function key(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function catalogType(row: ImportRow): "asset" | "consumable" | "accessory" | "software" {
-  const value = key(row.itemType ?? "");
-  if (value === "asset" || value === "accessory" || value === "software") return value;
-  return row.assetTag || row.serialNumber ? "asset" : "consumable";
-}
-
-function assetStatus(value?: string): "active" | "in_storage" | "under_repair" | "retired" {
-  const normalized = key(value ?? "").replace(/\s+/g, "_");
-  if (normalized === "active" || normalized === "under_repair" || normalized === "retired") return normalized;
-  return "in_storage";
+function catalogType(row: ImportRow): "consumable" | "accessory" {
+  return key(row.itemType ?? "") === "accessory" ? "accessory" : "consumable";
 }
 
 export function previewWorkbook(options: Pick<ImportOptions, "filePath" | "sheetName">): ImportSummary {
   const parsed = parseRows(options.filePath, options.sheetName);
-  const serialized = parsed.rows.filter((row) => row.assetTag || row.serialNumber).length;
   return {
     rows: parsed.rows.length,
-    assets: serialized,
-    stockItems: parsed.rows.length - serialized,
-    users: new Set(parsed.rows.map((row) => row.userEmail ?? row.assignedUser).filter(Boolean)).size,
+    skippedSerializedRows: parsed.skippedSerializedRows,
+    stockItems: new Set(parsed.rows.map((row) => `${key(row.itemName)}|${key(row.category)}|${key(row.location)}`)).size,
     locations: new Set(parsed.rows.map((row) => key(row.location))).size,
     vendors: new Set(parsed.rows.map((row) => key(row.vendor ?? "")).filter(Boolean)).size,
     catalogItems: new Set(parsed.rows.map((row) => `${key(row.itemName)}|${key(row.category)}`)).size,
@@ -205,8 +166,7 @@ export async function importWorkbook(options: ImportOptions): Promise<ImportSumm
   await db.transaction(async (tx) => {
     await tx.execute(sql`
       TRUNCATE TABLE
-        asset_events, software_assignments, software_licenses,
-        inventory_transactions, stock_items, assets,
+        inventory_transactions, stock_items,
         purchase_order_lines, purchase_orders, catalog_items,
         vendors, locations, users, departments
       RESTART IDENTITY CASCADE
@@ -219,38 +179,12 @@ export async function importWorkbook(options: ImportOptions): Promise<ImportSumm
       role: "IT Administrator",
       departmentId: importerDepartment.id,
     }).returning())[0];
-    const departmentIds = new Map<string, string>([[key("Imported"), importerDepartment.id]]);
-    const userIds = new Map<string, string>([[key(importer.email), importer.id], [key(importer.name), importer.id]]);
     const locationIds = new Map<string, string>();
     const vendorIds = new Map<string, string>();
     const catalogIds = new Map<string, string>();
     const stockTotals = new Map<string, { catalogItemId: string; locationId: string; quantity: number; reorderPoint?: number; sourceIds: string[] }>();
 
     for (const row of parsed.rows) {
-      let departmentId = importerDepartment.id;
-      if (row.department) {
-        const departmentKey = key(row.department);
-        departmentId = departmentIds.get(departmentKey) ?? (await tx.insert(departments).values({ name: row.department }).returning())[0].id;
-        departmentIds.set(departmentKey, departmentId);
-      }
-
-      let userId: string | undefined;
-      if (row.assignedUser || row.userEmail) {
-        const userKey = key(row.userEmail ?? row.assignedUser!);
-        userId = userIds.get(userKey);
-        if (!userId) {
-          const user = (await tx.insert(users).values({
-            name: row.assignedUser ?? row.userEmail!,
-            email: row.userEmail ?? `${userKey.replace(/[^a-z0-9]+/g, ".")}@import.local`,
-            role: "Imported User",
-            departmentId,
-          }).returning())[0];
-          userId = user.id;
-          userIds.set(userKey, userId);
-          userIds.set(key(user.name), userId);
-        }
-      }
-
       const locationKey = key(row.location);
       let locationId = locationIds.get(locationKey);
       if (!locationId) {
@@ -281,33 +215,19 @@ export async function importWorkbook(options: ImportOptions): Promise<ImportSumm
         catalogIds.set(catalogKey, catalogItemId);
       }
 
-      if (row.assetTag && row.serialNumber) {
-        await tx.insert(assets).values({
-          catalogItemId,
-          assetTag: row.assetTag,
-          serialNumber: row.serialNumber,
-          status: assetStatus(row.status),
-          purchaseDate: row.purchaseDate,
-          warrantyEndDate: row.warrantyEndDate,
-          locationId,
-          assignedUserId: userId,
-          notes: [row.notes, row.sourceId ? `Source AssetID: ${row.sourceId}` : undefined].filter(Boolean).join(" | ") || undefined,
-        });
+      const stockKey = `${catalogItemId}|${locationId}`;
+      const existing = stockTotals.get(stockKey);
+      if (existing) {
+        existing.quantity += row.quantity;
+        if (row.sourceId) existing.sourceIds.push(row.sourceId);
       } else {
-        const stockKey = `${catalogItemId}|${locationId}`;
-        const existing = stockTotals.get(stockKey);
-        if (existing) {
-          existing.quantity += row.quantity;
-          if (row.sourceId) existing.sourceIds.push(row.sourceId);
-        } else {
-          stockTotals.set(stockKey, {
-            catalogItemId,
-            locationId,
-            quantity: row.quantity,
-            reorderPoint: row.reorderPoint,
-            sourceIds: row.sourceId ? [row.sourceId] : [],
-          });
-        }
+        stockTotals.set(stockKey, {
+          catalogItemId,
+          locationId,
+          quantity: row.quantity,
+          reorderPoint: row.reorderPoint,
+          sourceIds: row.sourceId ? [row.sourceId] : [],
+        });
       }
     }
 

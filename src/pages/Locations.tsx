@@ -78,7 +78,7 @@ export default function Locations() {
     <DataState>
     <div className="p-8 max-w-5xl mx-auto">
       <div className="mb-8">
-        <p className="text-gray-500">Manage where assets are physically stored or assigned.</p>
+        <p className="text-gray-500">Manage where inventory is physically stored.</p>
       </div>
 
       {/* Toolbar */}
@@ -182,7 +182,8 @@ export default function Locations() {
             <tr>
               <th className="px-6 py-3 text-left">Location</th>
               <th className="px-6 py-3 text-left">Type</th>
-              <th className="px-6 py-3 text-left">Assets</th>
+              <th className="px-6 py-3 text-left">Stock Items</th>
+              <th className="px-6 py-3 text-left">Units</th>
               <th className="px-6 py-3 text-left">Manager</th>
               <th className="px-6 py-3 text-left">Notes</th>
               <th className="px-6 py-3" />
@@ -202,7 +203,8 @@ export default function Locations() {
                     {loc.typeLabel}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-gray-600">{loc.assetCount}</td>
+                <td className="px-6 py-4 text-gray-600">{loc.stockItemCount}</td>
+                <td className="px-6 py-4 text-gray-600">{loc.totalUnits}</td>
                 <td className="px-6 py-4 text-gray-600">{loc.manager}</td>
                 <td className="px-6 py-4 text-gray-500">{loc.notes}</td>
                 <td className="px-6 py-4 text-right">
@@ -217,7 +219,7 @@ export default function Locations() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-400">
+                <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">
                   No locations match your search.
                 </td>
               </tr>

@@ -2,15 +2,11 @@ import cors from "cors";
 import express from "express";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { attachActor } from "./middleware/auth.js";
-import { assetEventsRouter } from "./routes/assetEvents.js";
-import { assetsRouter } from "./routes/assets.js";
 import { catalogItemsRouter } from "./routes/catalogItems.js";
 import { departmentsRouter } from "./routes/departments.js";
 import { inventoryTransactionsRouter } from "./routes/inventoryTransactions.js";
 import { locationsRouter } from "./routes/locations.js";
 import { purchaseOrdersRouter } from "./routes/purchaseOrders.js";
-import { softwareAssignmentsRouter } from "./routes/softwareAssignments.js";
-import { softwareLicensesRouter } from "./routes/softwareLicenses.js";
 import { stockRouter } from "./routes/stock.js";
 import { usersRouter } from "./routes/users.js";
 import { vendorsRouter } from "./routes/vendors.js";
@@ -28,6 +24,9 @@ export function createApp() {
   );
   app.use(express.json());
 
+  // Deliberately does not query the database: Render pings this every few
+  // seconds, and a DB check would keep a Neon free-tier compute awake 24/7
+  // and burn through its monthly compute allowance.
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
   app.use("/api", attachActor);
@@ -38,12 +37,8 @@ export function createApp() {
   app.use("/api/vendors", vendorsRouter);
   app.use("/api/catalog-items", catalogItemsRouter);
   app.use("/api/purchase-orders", purchaseOrdersRouter);
-  app.use("/api/assets", assetsRouter);
   app.use("/api/stock", stockRouter);
-  app.use("/api/software-licenses", softwareLicensesRouter);
-  app.use("/api/software-assignments", softwareAssignmentsRouter);
   app.use("/api/inventory-transactions", inventoryTransactionsRouter);
-  app.use("/api/asset-events", assetEventsRouter);
 
   app.use(errorHandler);
 
