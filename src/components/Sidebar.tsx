@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useSettings } from "../lib/settings";
 import { useState } from "react";
 import { Menu, CircleHelp } from "lucide-react";
 import {
@@ -26,6 +27,14 @@ const navigation = [
 export default function Sidebar() {
   // Controls whether the sidebar shows labels or icons only
   const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const { supportEmail } = useSettings();
+
+  // Opens an email to the support address from Settings; until one is set, goes to Settings to add it.
+  function contactSupport() {
+    if (supportEmail) window.location.href = `mailto:${supportEmail}?subject=${encodeURIComponent("IT Inventory support request")}`;
+    else navigate("/settings");
+  }
   return (
     <aside
       className={`
@@ -162,14 +171,22 @@ export default function Sidebar() {
           <div className="rounded-lg bg-[#343434] p-2.5">
             <p className="text-xs font-semibold text-white">Need Help?</p>
             <p className="mt-0.5 text-[11px] text-gray-400">Submit a request or contact support.</p>
-            <button className="mt-2 w-full rounded-md bg-[#2B2B2B] py-1 text-[11px] font-medium text-white hover:bg-[#3A3A3A]">
+            <button
+              onClick={contactSupport}
+              title={supportEmail ? `Email ${supportEmail}` : "Set a support email in Settings first"}
+              className="mt-2 w-full rounded-md bg-[#2B2B2B] py-1 text-[11px] font-medium text-white hover:bg-[#3A3A3A]"
+            >
               Contact Support
             </button>
           </div>
         ) : (
-          <div className="flex justify-center rounded-lg bg-[#343434] p-2.5">
-            <CircleHelp size={18} className="text-gray-400" />
-          </div>
+          <button
+            onClick={contactSupport}
+            aria-label="Contact Support"
+            className="flex w-full justify-center rounded-lg bg-[#343434] p-2.5 text-gray-400 hover:text-white"
+          >
+            <CircleHelp size={18} />
+          </button>
         )}
 
 

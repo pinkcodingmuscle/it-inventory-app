@@ -1,6 +1,7 @@
 import { appData } from "../data/store";
 import type { CatalogItem, ID, PurchaseOrder, PurchaseOrderStatus } from "../types/domain";
 import { getAvailableQuantity, getInUseQuantity, getReorderPoint, getStockStatus, type StockStatus } from "./inventory";
+import { loadSettings } from "./settings";
 
 const data = appData;
 
@@ -16,8 +17,8 @@ export const stockStatusLabels: Record<StockStatus, string> = {
   out: "Out",
 };
 
-function formatCurrency(amount: number): string {
-  return amount.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+export function formatCurrency(amount: number): string {
+  return amount.toLocaleString("en-US", { style: "currency", currency: loadSettings().currency, maximumFractionDigits: 0 });
 }
 
 function getCatalogItem(id: ID): CatalogItem | undefined {

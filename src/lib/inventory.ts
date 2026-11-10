@@ -1,4 +1,5 @@
 import type { AppData, ID, InventoryTransaction, StockItem } from "../types/domain";
+import { loadSettings } from "./settings";
 
 export type StockStatus = "ok" | "low" | "out";
 
@@ -8,8 +9,9 @@ export function getStockStatus(quantity: number, reorderPoint: number): StockSta
   return "ok";
 }
 
+/** The item's own reorder point, else its catalog item's, else the default threshold from Settings. */
 export function getReorderPoint(item: StockItem, data: AppData): number {
-  return item.reorderPoint ?? data.catalogItems[item.catalogItemId]?.reorderPoint ?? 0;
+  return item.reorderPoint ?? data.catalogItems[item.catalogItemId]?.reorderPoint ?? loadSettings().lowStockThreshold;
 }
 
 /** Net units checked out and not yet returned for a catalog item at a location. */

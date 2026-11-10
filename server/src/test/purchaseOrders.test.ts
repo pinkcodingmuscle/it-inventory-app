@@ -43,3 +43,26 @@ describe("purchase order receiving", () => {
     expect(res.body.purchaseOrder.status).toBe("open");
   });
 });
+
+describe("purchase order cancelling", () => {
+  it("cancels an open order with nothing received", async () => {
+    const res = await request(app).post(`/api/purchase-orders/${ctx.po.id}/cancel`).set("x-user-id", ctx.admin.id);
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("cancelled");
+  });
+
+  it("refuses to cancel an order that is partly received", async () => {
+    await request(app)
+      .post(`/api/purchase-orders/${ctx.po.id}/receive`)
+      .set("x-user-id", ctx.admin.id)
+      .send({ locationId: ctx.location.id, lines: [{ lineId: ctx.poLine.id, quantity: 1 }] });
+    const res = await request(app).post(`/api/purchase-orders/${ctx.po.id}/cancel`).set("x-user-id", ctx.admin.id);
+    expect(res.status).toBe(400);
+  });
+
+  it("refuses to cancel an order twice", async () => {
+    await request(app).post(`/api/purchase-orders/${ctx.po.id}/cancel`).set("x-user-id", ctx.admin.id);
+    const res = await request(app).post(`/api/purchase-orders/${ctx.po.id}/cancel`).set("x-user-id", ctx.admin.id);
+    expect(res.status).toBe(400);
+  });
+});

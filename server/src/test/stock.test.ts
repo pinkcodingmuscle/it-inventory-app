@@ -1,6 +1,8 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
+import { db } from "../db/client.js";
+import { locations } from "../db/schema.js";
 import { resetAndSeed, type Fixtures } from "./fixtures.js";
 
 const app = createApp();
@@ -59,5 +61,46 @@ describe("stock checkout / return / adjust", () => {
       .set("x-user-id", "00000000-0000-0000-0000-000000000000")
       .send({ quantity: 1 });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("adding an item to stock", () => {
+  it("creates a stock line and records the starting quantity as an adjustment", async () => {
+    const [other] = await db.insert(locations).values({ name: "Second Room", type: "office" }).returning();
+    const res = await request(app)
+      .post("/api/stock")
+      .set("x-user-id", ctx.admin.id)
+      .send({ catalogItemId: ctx.consumableCatalogItem.id, locationId: other.id, quantity: 4, reorderPoint: 2 });
+    expect(res.status).toBe(201);
+    expect(res.body.stockItem.quantity).toBe(4);
+    expect(res.body.stockItem.reorderPoint).toBe(2);
+    expect(res.body.transaction.type).toBe("adjustment");
+    expect(res.body.transaction.quantity).toBe(4);
+  });
+
+  it("records no transaction when the starting quantity is zero", async () => {
+    const [other] = await db.insert(locations).values({ name: "Empty Room", type: "office" }).returning();
+    const res = await request(app)
+      .post("/api/stock")
+      .set("x-user-id", ctx.admin.id)
+      .send({ catalogItemId: ctx.consumableCatalogItem.id, locationId: other.id, quantity: 0 });
+    expect(res.status).toBe(201);
+    expect(res.body.transaction).toBeNull();
+  });
+
+  it("refuses a duplicate item/location pair", async () => {
+    const res = await request(app)
+      .post("/api/stock")
+      .set("x-user-id", ctx.admin.id)
+      .send({ catalogItemId: ctx.consumableCatalogItem.id, locationId: ctx.location.id, quantity: 1 });
+    expect(res.status).toBe(409);
+  });
+
+  it("blocks a technician from adding stock", async () => {
+    const res = await request(app)
+      .post("/api/stock")
+      .set("x-user-id", ctx.tech.id)
+      .send({ catalogItemId: ctx.consumableCatalogItem.id, locationId: ctx.location.id, quantity: 1 });
+    expect(res.status).toBe(403);
   });
 });

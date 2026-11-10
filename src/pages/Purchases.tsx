@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { DataState } from "../components/DataState";
+import { NewPurchaseOrderModal, ReceivePurchaseOrderModal } from "../components/PurchaseOrderForms";
 import { useData } from "../context/useData";
+import { cancelPurchaseOrder } from "../lib/api";
+import { useLinkParams } from "../lib/useLinkParams";
 import { getPurchaseStats, listPurchaseOrders } from "../lib/selectors";
 import type { PurchaseOrderStatus } from "../types/domain";
 
@@ -21,9 +24,29 @@ const filterLabels: Record<Filter, string> = {
 };
 
 export function Purchases() {
-  const { revision } = useData();
+  const { revision, refresh } = useData();
   const [search, setSearch]             = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
+  const [creating, setCreating]         = useState(false);
+  const [receivingId, setReceivingId]   = useState<string | null>(null);
+  const [rowError, setRowError]         = useState<string | null>(null);
+
+  // Links from the Dashboard and header search: ?new=1, ?q=...
+  useLinkParams((params) => {
+    if (params.has("q")) { setSearch(params.get("q") ?? ""); setActiveFilter("All"); }
+    if (params.get("new") === "1") setCreating(true);
+  });
+
+  async function handleCancel(id: string, poNumber: string) {
+    if (!window.confirm(`Cancel purchase order ${poNumber}? This can't be undone.`)) return;
+    setRowError(null);
+    try {
+      await cancelPurchaseOrder(id);
+      await refresh();
+    } catch (err) {
+      setRowError(err instanceof Error ? err.message : "Failed to cancel the purchase order.");
+    }
+  }
 
   const purchaseData = useMemo(() => listPurchaseOrders(), [revision]);
   const stats = useMemo(() => getPurchaseStats(), [revision]);
@@ -36,8 +59,9 @@ export function Purchases() {
   });
 
   return (
+    <>
     <DataState>
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 max-w-6xl mx-auto">
       <div className="mb-8">
         <p className="text-gray-500">Track purchase orders and procurement history.</p>
       </div>
@@ -53,7 +77,7 @@ export function Purchases() {
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="text-3xl font-bold text-gray-900">{stats.totalSpendLabel}</p>
-          <p className="mt-1 text-sm text-gray-500">Total Spend (2024)</p>
+          <p className="mt-1 text-sm text-gray-500">Total Spend</p>
         </div>
       </div>
 
@@ -81,7 +105,20 @@ export function Purchases() {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setCreating(true)}
+          className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Plus size={16} />
+          New Purchase Order
+        </button>
       </div>
+
+      {rowError && (
+        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {rowError}
+        </div>
+      )}
 
       <section className="rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
@@ -93,6 +130,7 @@ export function Purchases() {
               <th className="px-6 py-3 text-left">Date</th>
               <th className="px-6 py-3 text-left">Total</th>
               <th className="px-6 py-3 text-left">Status</th>
+              <th className="px-6 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -108,11 +146,31 @@ export function Purchases() {
                     {p.statusLabel}
                   </span>
                 </td>
+                <td className="whitespace-nowrap px-6 py-4 text-right">
+                  {p.status === "open" && (
+                    <>
+                      <button
+                        onClick={() => setReceivingId(p.id)}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-gray-100"
+                      >
+                        Receive
+                      </button>
+                      <button
+                        onClick={() => handleCancel(p.id, p.poNumber)}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-red-500 hover:bg-gray-100"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-400">No purchase orders match your search.</td>
+                <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">
+                  {purchaseData.length === 0 ? "No purchase orders yet. Click New Purchase Order to create one." : "No purchase orders match your search."}
+                </td>
               </tr>
             )}
           </tbody>
@@ -120,5 +178,8 @@ export function Purchases() {
       </section>
     </div>
     </DataState>
+    {creating && <NewPurchaseOrderModal onClose={() => setCreating(false)} />}
+    {receivingId && <ReceivePurchaseOrderModal purchaseOrderId={receivingId} onClose={() => setReceivingId(null)} />}
+    </>
   );
 }

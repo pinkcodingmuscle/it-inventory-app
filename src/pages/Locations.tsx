@@ -5,6 +5,7 @@ import { useData } from "../context/useData";
 import { appData } from "../data/store";
 import { createLocation, deleteLocation } from "../lib/api";
 import { listLocations } from "../lib/selectors";
+import { useLinkParams } from "../lib/useLinkParams";
 import type { Location } from "../types/domain";
 
 const typeOptions = ["Storage", "Office", "Meeting", "Remote"] as const;
@@ -27,6 +28,11 @@ export default function Locations() {
   const { revision, refresh } = useData();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+
+  // "+ Add Location" on the Settings page links here with ?new=1.
+  useLinkParams((params) => {
+    if (params.get("new") === "1") setShowForm(true);
+  });
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<(typeof typeOptions)[number]>("Office");
   const [newManagerId, setNewManagerId] = useState("");

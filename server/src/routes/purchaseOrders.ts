@@ -7,7 +7,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { NotFoundError } from "../lib/errors.js";
 import { toNumber } from "../lib/serialize.js";
 import { requirePermission } from "../middleware/auth.js";
-import { receivePurchaseOrder } from "../services/purchaseOrders.js";
+import { cancelPurchaseOrder, receivePurchaseOrder } from "../services/purchaseOrders.js";
 
 export const purchaseOrdersRouter = Router();
 
@@ -84,6 +84,15 @@ purchaseOrdersRouter.post(
       return { ...po, lines: lines.map(serializeLine) };
     });
     res.status(201).json(result);
+  })
+);
+
+purchaseOrdersRouter.post(
+  "/:id/cancel",
+  requirePermission("administrator", "inventory_manager"),
+  asyncHandler(async (req, res) => {
+    const result = await cancelPurchaseOrder(req.params.id);
+    res.json(result);
   })
 );
 

@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { inventoryTransactions, stockItems } from "../db/schema.js";
-import { BadRequestError, NotFoundError } from "../lib/errors.js";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors.js";
 
 type Executor = Pick<typeof db, "select">;
 
@@ -22,6 +22,52 @@ async function getCheckedOutQuantity(tx: Executor, catalogItemId: string, locati
     if (row.type === "return") checkedOut -= row.quantity;
   }
   return Math.max(0, checkedOut);
+}
+
+/**
+ * Starts tracking a catalog item at a location. A non-zero starting quantity
+ * is recorded as an adjustment so the ledger explains where the units came from.
+ */
+export async function createStockItem(
+  input: { catalogItemId: string; locationId: string; quantity: number; reorderPoint?: number; notes?: string },
+  performedByUserId: string
+) {
+  return db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ id: stockItems.id })
+      .from(stockItems)
+      .where(and(eq(stockItems.catalogItemId, input.catalogItemId), eq(stockItems.locationId, input.locationId)));
+    if (existing) {
+      throw new ConflictError("This item is already stocked at that location. Adjust its quantity instead.");
+    }
+
+    const [item] = await tx
+      .insert(stockItems)
+      .values({
+        catalogItemId: input.catalogItemId,
+        locationId: input.locationId,
+        quantity: input.quantity,
+        reorderPoint: input.reorderPoint,
+      })
+      .returning();
+
+    const [txn] =
+      input.quantity > 0
+        ? await tx
+            .insert(inventoryTransactions)
+            .values({
+              catalogItemId: input.catalogItemId,
+              locationId: input.locationId,
+              type: "adjustment",
+              quantity: input.quantity,
+              performedByUserId,
+              notes: input.notes ?? "Initial stock",
+            })
+            .returning()
+        : [];
+
+    return { stockItem: item, transaction: txn ?? null };
+  });
 }
 
 export async function checkoutStock(

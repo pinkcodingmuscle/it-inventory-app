@@ -8,6 +8,30 @@ export interface ReceiveLine {
   quantity: number;
 }
 
+/** Cancels an open purchase order. Orders with any units already received cannot be cancelled. */
+export async function cancelPurchaseOrder(purchaseOrderId: string) {
+  return db.transaction(async (tx) => {
+    const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, purchaseOrderId)).for("update");
+    if (!po) throw new NotFoundError("Purchase order not found");
+    if (po.status !== "open") throw new BadRequestError(`Only open purchase orders can be cancelled (this one is ${po.status}).`);
+
+    const lines = await tx
+      .select()
+      .from(purchaseOrderLines)
+      .where(eq(purchaseOrderLines.purchaseOrderId, purchaseOrderId));
+    if (lines.some((line) => line.receivedQuantity > 0)) {
+      throw new BadRequestError("Cannot cancel a purchase order that has already been partly received.");
+    }
+
+    const [updated] = await tx
+      .update(purchaseOrders)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(purchaseOrders.id, purchaseOrderId))
+      .returning();
+    return updated;
+  });
+}
+
 export async function receivePurchaseOrder(
   purchaseOrderId: string,
   locationId: string,

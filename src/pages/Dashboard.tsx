@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   XAxis, YAxis, BarChart, Bar,
@@ -6,6 +7,7 @@ import {
 import { Boxes, Package, CheckCircle2, AlertTriangle, XCircle, TrendingUp, FileText, Plus, ShoppingCart } from "lucide-react";
 import { DataState } from "../components/DataState";
 import { useData } from "../context/useData";
+import { downloadStockOnHand } from "../lib/reports";
 import {
   getDashboardStats,
   getInventoryStatusBreakdown,
@@ -17,9 +19,9 @@ import {
 } from "../lib/selectors";
 
 const quickActions = [
-  { label: "Add Inventory Item", icon: Package,      color: "bg-purple-50 text-purple-600" },
-  { label: "New Purchase Order", icon: ShoppingCart, color: "bg-blue-50 text-blue-600"     },
-  { label: "Generate Report",    icon: FileText,     color: "bg-amber-50 text-amber-600"   },
+  { label: "Add Inventory Item", icon: Package,      color: "bg-purple-50 text-purple-600", to: "/inventory?new=1" },
+  { label: "New Purchase Order", icon: ShoppingCart, color: "bg-blue-50 text-blue-600",     to: "/purchases?new=1" },
+  { label: "Generate Report",    icon: FileText,     color: "bg-amber-50 text-amber-600",   to: "/reports"         },
 ];
 
 function DonutChart({ data, total, label }: { data: DonutEntry[]; total: number; label: string }) {
@@ -56,6 +58,7 @@ function DonutChart({ data, total, label }: { data: DonutEntry[]; total: number;
 
 export function Dashboard() {
   const { revision } = useData();
+  const navigate = useNavigate();
   const stats = useMemo(() => getDashboardStats(), [revision]);
   const categoryData = useMemo(() => getStockByCategory(), [revision]);
   const inventoryStatusData = useMemo(() => getInventoryStatusBreakdown(), [revision]);
@@ -82,10 +85,17 @@ export function Dashboard() {
           <p className="text-gray-500">Overview of your IT inventory, stock levels, and purchasing.</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+          <button
+            onClick={() => downloadStockOnHand()}
+            title="Download a stock-on-hand spreadsheet (CSV)"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
             <FileText size={15} /> Export Report
           </button>
-          <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+          <button
+            onClick={() => navigate("/inventory?new=1")}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
             <Plus size={15} /> Add New
           </button>
         </div>
@@ -139,9 +149,12 @@ export function Dashboard() {
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-900">Recent Purchases</p>
-            <button className="text-xs text-blue-600 hover:underline">View all</button>
+            <button onClick={() => navigate("/purchases")} className="text-xs text-blue-600 hover:underline">View all</button>
           </div>
           <div className="space-y-3.5">
+            {recentPurchases.length === 0 && (
+              <p className="text-xs text-gray-400">No purchase orders yet.</p>
+            )}
             {recentPurchases.map((p, i) => (
               <div key={i} className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -160,7 +173,7 @@ export function Dashboard() {
         <div className="col-span-3 rounded-xl border border-gray-200 bg-white">
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <p className="text-sm font-semibold text-gray-900">Items Needing Reorder</p>
-            <button className="text-xs text-blue-600 hover:underline">View all</button>
+            <button onClick={() => navigate("/inventory?status=reorder")} className="text-xs text-blue-600 hover:underline">View all</button>
           </div>
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50 text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -202,7 +215,7 @@ export function Dashboard() {
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
-                <button key={action.label} className="flex w-full items-center gap-3 rounded-lg border border-gray-100 p-3 text-left hover:bg-gray-50">
+                <button key={action.label} onClick={() => navigate(action.to)} className="flex w-full items-center gap-3 rounded-lg border border-gray-100 p-3 text-left hover:bg-gray-50">
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${action.color}`}>
                     <Icon size={16} />
                   </div>

@@ -87,7 +87,7 @@ function parseRows(filePath: string, sheetName?: string): { rows: ImportRow[]; s
   const workbook = XLSX.readFile(filePath, { cellDates: true });
   const selectedSheet = sheetName ?? workbook.SheetNames[0];
   if (!selectedSheet || !workbook.Sheets[selectedSheet]) {
-    return { rows: [], errors: [`Worksheet not found: ${sheetName ?? "first worksheet"}`] };
+    return { rows: [], skippedSerializedRows: 0, errors: [`Worksheet not found: ${sheetName ?? "first worksheet"}`] };
   }
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[selectedSheet], { defval: "" });
   const errors: string[] = [];
