@@ -27,7 +27,10 @@ npm run server:install
 npm run db:migrate
 npm run db:seed
 
-# 4. Install frontend dependencies
+# 4. Give yourself a sign-in (seeded users have no passwords)
+npm run user:set-password -- e.mukuye@kayaku.com   # or any email, plus --name "Full Name" to create a new admin
+
+# 5. Install frontend dependencies
 npm install
 ```
 
@@ -70,9 +73,10 @@ npm run db:migrate  # apply pending migrations
 npm run db:seed     # reset to the repeatable development dataset
 npm run db:import -- /absolute/path/to/inventory.xlsx --dry-run  # preview a real workbook
 npm run db:import -- /absolute/path/to/inventory.xlsx --replace   # replace development data after validation and backup
+npm run user:set-password -- you@example.com [--name "Full Name"] [--role "IT Administrator"]  # set a password / create a user
 ```
 
-The importer loads stock rows only; rows with an asset tag or serial number are skipped and counted as `skippedSerializedRows` in the summary.
+The importer loads stock rows only; rows with an asset tag or serial number are skipped and counted as `skippedSerializedRows` in the summary. `--replace` replaces the inventory data (items, stock, history, vendors, locations, orders) but keeps users, so sign-ins survive a re-import. `db:seed` resets everything, users included.
 
 Migrations live in `server/migrations` and are generated from `server/src/db/schema.ts` via Drizzle Kit (`npm --prefix server run db:generate` after changing the schema).
 
@@ -103,7 +107,12 @@ Production uses [Neon](https://neon.tech) serverless Postgres (free tier) for th
    pg_restore --no-owner --no-acl -d '<neon url>' inventory.dump
    ```
    An exported `DATABASE_URL` overrides the one in `.env`.
-5. **Frontend.** Build it with `VITE_API_URL=https://<render-service>.onrender.com/api` (set it in Netlify's environment variables).
+5. **Create the first sign-in.** Nobody can sign in until someone has a password. Create yourself as an administrator (you'll be asked for the password twice; it isn't echoed):
+   ```bash
+   DATABASE_URL='<neon url>' npm run user:set-password -- you@example.com --name "Your Name"
+   ```
+   Then add everyone else from **Settings → Users** in the app.
+6. **Frontend.** Build it with `VITE_API_URL=https://<render-service>.onrender.com/api` (set it in Netlify's environment variables).
 
 Notes:
 - If `DATABASE_URL` points anywhere other than localhost and has no `sslmode`, the API requires TLS anyway (`server/src/db/client.ts`).
@@ -111,12 +120,38 @@ Notes:
 - Neon's free tier keeps only a short restore history. For business data, take regular `pg_dump` backups as well.
 - Tests never use the Neon URL unless you point them at it: they read `TEST_DATABASE_URL` first, then fall back to a local test database.
 
-## Authorization stub
+## Trying risky changes on a Neon branch
 
-There is no login flow yet. The `users` table holds the IT staff who operate the system (for permissions and the transaction audit trail), not tracked end users. Requests identify the acting user via an `x-user-id` header (or fall back to a seeded administrator), and that user's job-title `role` is mapped onto one of four permission tiers (administrator / inventory manager / technician / read-only) from section 10 of the persistence proposal. See `server/src/middleware/auth.ts` — this is a development placeholder, not real authentication, and should be replaced before this ever handles production data.
+Before anything that rewrites production data (a `--replace` import, a hand-written migration, bulk edits), try it on a [Neon branch](https://neon.com/docs/introduction/branching): an instant copy of the database that you can throw away.
+
+```bash
+neon branches create --name try-import            # copy of production, made in seconds
+neon connection-string try-import                 # its URL (keep it out of chat/commits)
+DATABASE_URL='<branch url>' npm run db:import -- /absolute/path/to/inventory.xlsx --replace
+# ...check the result, e.g. run the API against the branch...
+neon branches delete try-import                   # discard it
+```
+
+If it went well, repeat the command against production.
+
+## Sign-in and permissions
+
+Everyone signs in with an email and password (`POST /api/auth/login`). New staff can request an account from the sign-in page's **Create account** tab (`POST /api/auth/signup`): the account starts as *pending* with view-only access and can't sign in until an administrator approves it, choosing its role, in **Settings → Users** (the bell shows administrators how many requests are waiting). Declining deletes the request. Sign-ups are limited to 20 per IP address per hour (`SIGNUPS_PER_HOUR` to change). The very first administrator still has to be created with `npm run user:set-password`, so a stranger can't sign up and approve themselves. Passwords are stored as scrypt hashes; the browser holds a random session token (7 days), and only its SHA-256 hash is stored in the `sessions` table. Every API route except `/api/auth/login` and `/api/health` requires a session. After 10 failed sign-ins for one email or IP address within 15 minutes, further attempts are refused until the window passes.
+
+The `users` table holds the IT staff who operate the system (for permissions and the transaction audit trail), not tracked end users. Each user's job-title `role` maps onto a permission tier (`server/src/middleware/auth.ts`):
+
+| Role contains | Tier | Can |
+| --- | --- | --- |
+| "Administrator" | administrator | everything, including **Settings → Users** (add users, change roles, deactivate, reset passwords) |
+| "Manager" | inventory manager | add/edit/delete items, vendors, locations and purchase orders; recount stock; change settings |
+| "Support", "Technician" or "Engineer" | technician | view everything; check stock out and back in |
+| anything else (e.g. "Viewer") | read only | view everything |
+
+The UI hides actions a user can't perform, and the API enforces the same rules. Forgotten passwords are reset by an administrator in Settings, or with `npm run user:set-password` from a machine with database access.
 
 ## Tests
 
 ```bash
-npm --prefix server test
+npm --prefix server test   # API tests (vitest + supertest) against a local test database
+npm run test:e2e           # browser tests (Playwright); see e2e/README.md for setup
 ```

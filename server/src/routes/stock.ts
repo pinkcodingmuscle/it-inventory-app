@@ -1,18 +1,23 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db } from "../db/client.js";
-import { stockItems } from "../db/schema.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { requirePermission } from "../middleware/auth.js";
-import { adjustStock, checkoutStock, createStockItem, returnStock } from "../services/stock.js";
+import {
+  adjustStock,
+  checkoutStock,
+  createStockItem,
+  deleteStockItem,
+  listStockWithCheckedOut,
+  returnStock,
+  updateStockItem,
+} from "../services/stock.js";
 
 export const stockRouter = Router();
 
 stockRouter.get(
   "/",
   asyncHandler(async (_req, res) => {
-    const rows = await db.select().from(stockItems);
-    res.json(rows);
+    res.json(await listStockWithCheckedOut());
   })
 );
 
@@ -71,5 +76,25 @@ stockRouter.post(
     const body = adjustSchema.parse(req.body);
     const result = await adjustStock(req.params.id, body.quantity, req.actor!.id, body.notes);
     res.status(201).json(result);
+  })
+);
+
+const updateSchema = z.object({ reorderPoint: z.number().int().min(0).nullable() }).partial();
+
+stockRouter.patch(
+  "/:id",
+  requirePermission("administrator", "inventory_manager"),
+  asyncHandler(async (req, res) => {
+    const body = updateSchema.parse(req.body);
+    res.json(await updateStockItem(req.params.id, body));
+  })
+);
+
+stockRouter.delete(
+  "/:id",
+  requirePermission("administrator", "inventory_manager"),
+  asyncHandler(async (req, res) => {
+    await deleteStockItem(req.params.id);
+    res.status(204).end();
   })
 );

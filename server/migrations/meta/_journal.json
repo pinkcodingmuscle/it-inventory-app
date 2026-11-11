@@ -22,6 +22,20 @@
       "when": 1792511998127,
       "tag": "0002_inventory_only",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794328538473,
+      "tag": "0003_auth_sessions_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794332271865,
+      "tag": "0004_user_signup_pending",
+      "breakpoints": true
     }
   ]
 }

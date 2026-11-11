@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
-import { Search, Plus, Building2 } from "lucide-react";
+import { useState } from "react";
+import { Search, Plus, Building2, Pencil } from "lucide-react";
 import { DataState } from "../components/DataState";
 import { Field, FormError, Modal, inputClass, primaryButtonClass, secondaryButtonClass } from "../components/Modal";
+import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
-import { createVendor } from "../lib/api";
+import { appData } from "../data/store";
+import { createVendor, deleteVendor, updateVendor } from "../lib/api";
 import { listVendors } from "../lib/selectors";
 import type { Vendor } from "../types/domain";
 
@@ -20,15 +22,34 @@ const categoryOptions: { value: Vendor["category"]; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-function AddVendorModal({ onClose }: { onClose: () => void }) {
+/** Add a vendor, or edit (and delete) an existing one. */
+function VendorModal({ vendor, onClose }: { vendor?: Vendor; onClose: () => void }) {
   const { refresh } = useData();
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<Vendor["category"]>("hardware");
-  const [contactName, setContactName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(vendor?.name ?? "");
+  const [category, setCategory] = useState<Vendor["category"]>(vendor?.category ?? "hardware");
+  const [contactName, setContactName] = useState(vendor?.contactName ?? "");
+  const [email, setEmail] = useState(vendor?.email ?? "");
+  const [phone, setPhone] = useState(vendor?.phone ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const orderCount = vendor ? Object.values(appData.purchaseOrders).filter((po) => po.vendorId === vendor.id).length : 0;
+
+  async function handleDelete() {
+    if (!vendor) return;
+    setError(null);
+    setSaving(true);
+    try {
+      await deleteVendor(vendor.id);
+      onClose();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete the vendor.");
+      setConfirmingDelete(false);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleSave() {
     setError(null);
@@ -36,17 +57,27 @@ function AddVendorModal({ onClose }: { onClose: () => void }) {
     if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError("That email address doesn't look valid.");
     setSaving(true);
     try {
-      await createVendor({
-        name: name.trim(),
-        category,
-        contactName: contactName.trim() || undefined,
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
-      });
+      if (vendor) {
+        await updateVendor(vendor.id, {
+          name: name.trim(),
+          category,
+          contactName: contactName.trim() || null,
+          email: email.trim() || null,
+          phone: phone.trim() || null,
+        });
+      } else {
+        await createVendor({
+          name: name.trim(),
+          category,
+          contactName: contactName.trim() || undefined,
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
+        });
+      }
       onClose();
       await refresh();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to add vendor.";
+      const message = err instanceof Error ? err.message : "Failed to save the vendor.";
       setError(/unique/i.test(message) ? "A vendor with that name already exists." : message);
     } finally {
       setSaving(false);
@@ -55,19 +86,39 @@ function AddVendorModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Add Vendor"
+      title={vendor ? `Edit ${vendor.name}` : "Add Vendor"}
       onClose={onClose}
       footer={
-        <>
-          <button onClick={onClose} className={secondaryButtonClass}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} className={primaryButtonClass}>
-            {saving ? "Saving..." : "Add Vendor"}
-          </button>
-        </>
+        confirmingDelete ? (
+          <>
+            <span className="mr-auto self-center text-sm text-gray-700">Delete {vendor?.name}? Items that named it keep existing.</span>
+            <button onClick={() => setConfirmingDelete(false)} className={secondaryButtonClass}>Keep</button>
+            <button onClick={handleDelete} disabled={saving} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
+              {saving ? "Deleting..." : "Delete"}
+            </button>
+          </>
+        ) : (
+          <>
+            {vendor && (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                disabled={orderCount > 0}
+                title={orderCount > 0 ? `Has ${orderCount} purchase order${orderCount === 1 ? "" : "s"}, so it can't be deleted` : undefined}
+                className="mr-auto rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Delete
+              </button>
+            )}
+            <button onClick={onClose} className={secondaryButtonClass}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} className={primaryButtonClass}>
+              {saving ? "Saving..." : vendor ? "Save" : "Add Vendor"}
+            </button>
+          </>
+        )
       }
     >
       <FormError message={error} />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Vendor name *">
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Dell Technologies" autoFocus />
         </Field>
@@ -82,7 +133,7 @@ function AddVendorModal({ onClose }: { onClose: () => void }) {
         <Field label="Phone">
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
         </Field>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <Field label="Email">
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
           </Field>
@@ -93,11 +144,12 @@ function AddVendorModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function Vendors() {
-  const { revision } = useData();
+  useData();
+  const { canManage } = usePermissions();
   const [search, setSearch] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Vendor | "new" | null>(null);
 
-  const vendorData = useMemo(() => listVendors(), [revision]);
+  const vendorData = listVendors().sort((a, b) => a.name.localeCompare(b.name));
 
   const filtered = vendorData.filter((v) =>
     v.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -107,13 +159,13 @@ export default function Vendors() {
   return (
     <>
     <DataState>
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl p-4 sm:p-8">
       <div className="mb-8">
         <p className="text-gray-500">Manage suppliers and procurement contacts.</p>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 flex-1 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex h-10 min-w-[12rem] flex-1 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4">
           <Search size={16} className="text-gray-400" />
           <input
             type="text"
@@ -123,17 +175,19 @@ export default function Vendors() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
           />
         </div>
-        <button
-          onClick={() => setAdding(true)}
-          className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          Add Vendor
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setEditing("new")}
+            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <Plus size={16} />
+            Add Vendor
+          </button>
+        )}
       </div>
 
-      <section className="rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
+      <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="w-full min-w-[48rem] text-sm">
           <thead className="border-b border-gray-100 bg-gray-50 text-xs font-medium uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-6 py-3 text-left">Vendor</th>
@@ -142,6 +196,7 @@ export default function Vendors() {
               <th className="px-6 py-3 text-left">Email</th>
               <th className="px-6 py-3 text-left">Phone</th>
               <th className="px-6 py-3 text-left">Items Supplied</th>
+              <th className="px-6 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -164,12 +219,24 @@ export default function Vendors() {
                 </td>
                 <td className="px-6 py-4 text-gray-500">{vendor.phone}</td>
                 <td className="px-6 py-4 text-gray-600">{vendor.suppliedCount}</td>
+                <td className="px-6 py-4 text-right">
+                  {canManage && (
+                    <button
+                      onClick={() => setEditing(appData.vendors[vendor.id])}
+                      aria-label={`Edit ${vendor.name}`}
+                      title="Edit"
+                      className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-400">
-                  {vendorData.length === 0 ? "No vendors yet. Click Add Vendor to create one." : "No vendors match your search."}
+                <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">
+                  {vendorData.length === 0 ? (canManage ? "No vendors yet. Click Add Vendor to create one." : "No vendors yet.") : "No vendors match your search."}
                 </td>
               </tr>
             )}
@@ -178,7 +245,7 @@ export default function Vendors() {
       </section>
     </div>
     </DataState>
-    {adding && <AddVendorModal onClose={() => setAdding(false)} />}
+    {editing && <VendorModal vendor={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
     </>
   );
 }

@@ -1,5 +1,5 @@
 import XLSX from "xlsx";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, pool } from "../db/client.js";
 import {
   catalogItems,
@@ -164,21 +164,30 @@ export async function importWorkbook(options: ImportOptions): Promise<ImportSumm
   if (!options.replace) throw new Error("Importing real data requires --replace. Run with --dry-run first.");
 
   await db.transaction(async (tx) => {
+    // Replace inventory data, but keep users and departments: they hold sign-in
+    // accounts (passwords, sessions) that have nothing to do with the workbook.
     await tx.execute(sql`
       TRUNCATE TABLE
         inventory_transactions, stock_items,
         purchase_order_lines, purchase_orders, catalog_items,
-        vendors, locations, users, departments
+        vendors, locations
       RESTART IDENTITY CASCADE
     `);
 
-    const importerDepartment = (await tx.insert(departments).values({ name: "Imported" }).returning())[0];
-    const importer = (await tx.insert(users).values({
-      name: "Data Importer",
-      email: "data-importer@local.invalid",
-      role: "IT Administrator",
-      departmentId: importerDepartment.id,
-    }).returning())[0];
+    const importerEmail = "data-importer@local.invalid";
+    const importerDepartment =
+      (await tx.select().from(departments).where(eq(departments.name, "Imported")).limit(1))[0] ??
+      (await tx.insert(departments).values({ name: "Imported" }).returning())[0];
+    // The importer is recorded as performing the initial-stock transactions. It
+    // has no password, so nobody can sign in as it.
+    const importer =
+      (await tx.select().from(users).where(eq(users.email, importerEmail)).limit(1))[0] ??
+      (await tx.insert(users).values({
+        name: "Data Importer",
+        email: importerEmail,
+        role: "IT Administrator",
+        departmentId: importerDepartment.id,
+      }).returning())[0];
     const locationIds = new Map<string, string>();
     const vendorIds = new Map<string, string>();
     const catalogIds = new Map<string, string>();

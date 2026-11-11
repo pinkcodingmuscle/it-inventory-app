@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
-// App preferences. There is no settings table on the server yet, so these are
-// kept in this browser's localStorage: they persist across reloads on one
-// machine but are not shared between users or devices.
+// Organisation-wide preferences, stored on the server (GET/PUT /api/settings)
+// so every user and device sees the same values. DataContext loads them with
+// the rest of the data; this module keeps the current copy for plain
+// functions (selectors, formatting) and lets components subscribe to changes.
 export interface AppSettings {
   organizationName: string;
   defaultLocationId: string;
@@ -15,9 +16,6 @@ export interface AppSettings {
   supportEmail: string;
 }
 
-const KEY = "it-inventory:settings";
-const EVENT = "it-inventory:settings-changed";
-
 export const defaultSettings: AppSettings = {
   organizationName: "Kayaku Advanced Materials",
   defaultLocationId: "",
@@ -28,36 +26,41 @@ export const defaultSettings: AppSettings = {
   supportEmail: "",
 };
 
+let current: AppSettings = defaultSettings;
+const listeners = new Set<() => void>();
+
 export function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? { ...defaultSettings, ...JSON.parse(raw) } : defaultSettings;
-  } catch {
-    return defaultSettings;
-  }
+  return current;
 }
 
-export function saveSettings(next: AppSettings): boolean {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event(EVENT));
-    return true;
-  } catch {
-    return false;
-  }
+/** Replaces the in-memory copy (after loading from or saving to the server). */
+export function setCurrentSettings(next: AppSettings) {
+  current = { ...defaultSettings, ...next };
+  listeners.forEach((l) => l());
 }
 
-/** Current settings, re-rendering when they are saved anywhere in the app. */
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/** Current settings, re-rendering when they change. */
 export function useSettings(): AppSettings {
-  const [settings, setSettings] = useState(loadSettings);
-  useEffect(() => {
-    const update = () => setSettings(loadSettings());
-    window.addEventListener(EVENT, update);
-    window.addEventListener("storage", update);
-    return () => {
-      window.removeEventListener(EVENT, update);
-      window.removeEventListener("storage", update);
-    };
-  }, []);
-  return settings;
+  return useSyncExternalStore(subscribe, loadSettings);
+}
+
+// Before settings moved to the server they lived in each browser's
+// localStorage under this key. DataContext offers that copy to the server
+// once, the first time an admin or manager loads the app.
+const LEGACY_KEY = "it-inventory:settings";
+
+export function takeLegacyLocalSettings(): AppSettings | null {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return null;
+    localStorage.removeItem(LEGACY_KEY);
+    return { ...defaultSettings, ...JSON.parse(raw) };
+  } catch {
+    return null;
+  }
 }

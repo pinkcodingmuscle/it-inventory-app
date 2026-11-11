@@ -1,11 +1,10 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useSettings } from "../lib/settings";
 import { useState } from "react";
-import { Menu, CircleHelp } from "lucide-react";
+import { Menu, CircleHelp, X } from "lucide-react";
 import {
   LayoutDashboard,
   Package,
-  Trash2,
   ShoppingCart,
   Building2,
   MapPin,
@@ -16,7 +15,6 @@ import {
 const navigation = [
   { name: "Dashboard",   path: "/",           icon: LayoutDashboard },
   { name: "Inventory",   path: "/inventory",   icon: Package         },
-  { name: "Consumables", path: "/consumables", icon: Trash2          },
   { name: "Purchases",   path: "/purchases",   icon: ShoppingCart    },
   { name: "Vendors",     path: "/vendors",     icon: Building2       },
   { name: "Locations",   path: "/locations",   icon: MapPin          },
@@ -24,9 +22,11 @@ const navigation = [
   { name: "Settings",    path: "/settings",    icon: Settings        },
 ];
 
-export default function Sidebar() {
-  // Controls whether the sidebar shows labels or icons only
-  const [collapsed, setCollapsed] = useState(false);
+export default function Sidebar({ drawerOpen, onCloseDrawer }: { drawerOpen: boolean; onCloseDrawer: () => void }) {
+  // Controls whether the sidebar shows labels or icons only (desktop only; the
+  // mobile drawer always shows labels).
+  const [collapsedSetting, setCollapsed] = useState(false);
+  const collapsed = collapsedSetting && !drawerOpen;
   const navigate = useNavigate();
   const { supportEmail } = useSettings();
 
@@ -36,14 +36,21 @@ export default function Sidebar() {
     else navigate("/settings");
   }
   return (
+    <>
+    {/* Backdrop behind the mobile drawer */}
+    {drawerOpen && (
+      <div className="fixed inset-0 z-40 bg-gray-900/40 lg:hidden" onClick={onCloseDrawer} aria-hidden="true" />
+    )}
     <aside
+      aria-label="Main navigation"
       className={`
-        sticky top-0
+        fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:z-auto
         flex h-screen flex-col
         shrink-0
         bg-[#2B2B2B]
         text-white
         transition-all duration-300
+        ${drawerOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
         ${collapsed ? "w-24" : "w-56"}
       `}
     >
@@ -63,12 +70,20 @@ export default function Sidebar() {
           )}
         </div>
 
-        {/* Collapse button */}
+        {/* Collapse button (desktop) / close button (mobile drawer) */}
         <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="rounded-lg p-1.5 text-gray-400 hover:bg-[#383838] hover:text-white"
+          onClick={() => setCollapsed(!collapsedSetting)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden rounded-lg p-1.5 text-gray-400 hover:bg-[#383838] hover:text-white lg:block"
         >
           <Menu size={20} />
+        </button>
+        <button
+          onClick={onCloseDrawer}
+          aria-label="Close menu"
+          className="rounded-lg p-1.5 text-gray-400 hover:bg-[#383838] hover:text-white lg:hidden"
+        >
+          <X size={20} />
         </button>
       </div>
 
@@ -232,6 +247,7 @@ export default function Sidebar() {
       </div>
 
     </aside>
+    </>
   );
 }
 

@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Trash2 } from "lucide-react";
 import { useData } from "../context/useData";
 import { appData } from "../data/store";
 import { createPurchaseOrder, receivePurchaseOrder } from "../lib/api";
+import { formatCurrency } from "../lib/selectors";
 import { useSettings } from "../lib/settings";
 import { Field, FormError, Modal, inputBase, inputClass, primaryButtonClass, secondaryButtonClass } from "./Modal";
 
@@ -23,16 +24,14 @@ function suggestPoNumber(): string {
   }
 }
 
-const money = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 export function NewPurchaseOrderModal({ onClose }: { onClose: () => void }) {
-  const { revision, refresh } = useData();
-  const vendors = useMemo(() => Object.values(appData.vendors).sort((a, b) => a.name.localeCompare(b.name)), [revision]);
-  const catalog = useMemo(() => Object.values(appData.catalogItems).sort((a, b) => a.name.localeCompare(b.name)), [revision]);
+  const { refresh } = useData();
+  const vendors = Object.values(appData.vendors).sort((a, b) => a.name.localeCompare(b.name));
+  const catalog = Object.values(appData.catalogItems).sort((a, b) => a.name.localeCompare(b.name));
 
   const [typedPoNumber, setPoNumber] = useState<string | null>(null);
   // Until the user edits it, follow the suggestion - which updates once data has loaded.
-  const suggestedPoNumber = useMemo(() => suggestPoNumber(), [revision]);
+  const suggestedPoNumber = suggestPoNumber();
   const poNumber = typedPoNumber ?? suggestedPoNumber;
   const [vendorId, setVendorId] = useState("");
   const [orderDate, setOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -102,7 +101,7 @@ export function NewPurchaseOrderModal({ onClose }: { onClose: () => void }) {
       wide
       footer={
         <>
-          <span className="mr-auto self-center text-sm text-gray-600">Total: <strong>{money(total)}</strong></span>
+          <span className="mr-auto self-center text-sm text-gray-600">Total: <strong>{formatCurrency(total)}</strong></span>
           <button onClick={onClose} className={secondaryButtonClass}>Cancel</button>
           <button onClick={handleSave} disabled={saving} className={primaryButtonClass}>
             {saving ? "Saving..." : "Create Purchase Order"}
@@ -111,7 +110,7 @@ export function NewPurchaseOrderModal({ onClose }: { onClose: () => void }) {
       }
     >
       <FormError message={error} />
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="PO number *">
           <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className={inputClass} />
         </Field>
@@ -182,14 +181,13 @@ export function NewPurchaseOrderModal({ onClose }: { onClose: () => void }) {
 
 /** Receive the outstanding quantities of an open purchase order into one location. */
 export function ReceivePurchaseOrderModal({ purchaseOrderId, onClose }: { purchaseOrderId: string; onClose: () => void }) {
-  const { revision, refresh } = useData();
+  const { refresh } = useData();
   const settings = useSettings();
   const po = appData.purchaseOrders[purchaseOrderId];
-  const lines = useMemo(
-    () => Object.values(appData.purchaseOrderLines).filter((l) => l.purchaseOrderId === purchaseOrderId && l.receivedQuantity < l.quantity),
-    [purchaseOrderId, revision]
+  const lines = Object.values(appData.purchaseOrderLines).filter(
+    (l) => l.purchaseOrderId === purchaseOrderId && l.receivedQuantity < l.quantity
   );
-  const locations = useMemo(() => Object.values(appData.locations).sort((a, b) => a.name.localeCompare(b.name)), [revision]);
+  const locations = Object.values(appData.locations).sort((a, b) => a.name.localeCompare(b.name));
 
   const [chosenLocationId, setLocationId] = useState("");
   const locationId =

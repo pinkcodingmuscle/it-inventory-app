@@ -11,7 +11,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:import": "tsx src/import/importWorkbook.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "user:set-password": "tsx src/scripts/setPassword.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

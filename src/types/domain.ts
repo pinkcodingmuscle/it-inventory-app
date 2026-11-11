@@ -33,6 +33,8 @@ export interface StockItem {
   locationId: ID;
   quantity: number;
   reorderPoint?: number;
+  /** Units currently checked out (net of returns), computed by the API. */
+  checkedOut: number;
 }
 
 export interface InventoryTransaction {
@@ -53,7 +55,21 @@ export interface User {
   email: string;
   role: string;
   departmentId?: ID;
-  status: "active" | "inactive";
+  /** "pending" = signed up in the app, waiting for an administrator's approval. */
+  status: "active" | "inactive" | "pending";
+  /** Whether the user has a password, i.e. can sign in. */
+  hasPassword: boolean;
+}
+
+export type Permission = "administrator" | "inventory_manager" | "technician" | "read_only";
+
+/** The signed-in user. */
+export interface Actor {
+  id: ID;
+  name: string;
+  email: string;
+  role: string;
+  permission: Permission;
 }
 
 export interface Department {
@@ -99,7 +115,6 @@ export interface PurchaseOrderLine {
 export interface AppData {
   catalogItems: Record<ID, CatalogItem>;
   stockItems: Record<ID, StockItem>;
-  inventoryTransactions: Record<ID, InventoryTransaction>;
   users: Record<ID, User>;
   departments: Record<ID, Department>;
   locations: Record<ID, Location>;

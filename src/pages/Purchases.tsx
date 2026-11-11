@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { DataState } from "../components/DataState";
 import { NewPurchaseOrderModal, ReceivePurchaseOrderModal } from "../components/PurchaseOrderForms";
+import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
 import { cancelPurchaseOrder } from "../lib/api";
 import { useLinkParams } from "../lib/useLinkParams";
@@ -24,7 +25,8 @@ const filterLabels: Record<Filter, string> = {
 };
 
 export function Purchases() {
-  const { revision, refresh } = useData();
+  const { refresh } = useData();
+  const { canManage } = usePermissions();
   const [search, setSearch]             = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [creating, setCreating]         = useState(false);
@@ -34,7 +36,7 @@ export function Purchases() {
   // Links from the Dashboard and header search: ?new=1, ?q=...
   useLinkParams((params) => {
     if (params.has("q")) { setSearch(params.get("q") ?? ""); setActiveFilter("All"); }
-    if (params.get("new") === "1") setCreating(true);
+    if (params.get("new") === "1" && canManage) setCreating(true);
   });
 
   async function handleCancel(id: string, poNumber: string) {
@@ -48,8 +50,8 @@ export function Purchases() {
     }
   }
 
-  const purchaseData = useMemo(() => listPurchaseOrders(), [revision]);
-  const stats = useMemo(() => getPurchaseStats(), [revision]);
+  const purchaseData = listPurchaseOrders();
+  const stats = getPurchaseStats();
 
   const filtered = purchaseData.filter((p) => {
     const matchesSearch = p.poNumber.toLowerCase().includes(search.toLowerCase()) ||
@@ -61,12 +63,12 @@ export function Purchases() {
   return (
     <>
     <DataState>
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl p-4 sm:p-8">
       <div className="mb-8">
         <p className="text-gray-500">Track purchase orders and procurement history.</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-5">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="text-3xl font-bold text-blue-600">{stats.openCount}</p>
           <p className="mt-1 text-sm text-gray-500">Open POs</p>
@@ -81,8 +83,8 @@ export function Purchases() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 flex-1 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex h-10 min-w-[12rem] flex-1 items-center gap-3 rounded-lg border border-gray-200 bg-white px-4">
           <Search size={16} className="text-gray-400" />
           <input
             type="text"
@@ -105,13 +107,15 @@ export function Purchases() {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          New Purchase Order
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setCreating(true)}
+            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <Plus size={16} />
+            New Purchase Order
+          </button>
+        )}
       </div>
 
       {rowError && (
@@ -120,8 +124,8 @@ export function Purchases() {
         </div>
       )}
 
-      <section className="rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
+      <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="w-full min-w-[52rem] text-sm">
           <thead className="border-b border-gray-100 bg-gray-50 text-xs font-medium uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-6 py-3 text-left">PO Number</th>
@@ -147,7 +151,7 @@ export function Purchases() {
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-right">
-                  {p.status === "open" && (
+                  {p.status === "open" && canManage && (
                     <>
                       <button
                         onClick={() => setReceivingId(p.id)}

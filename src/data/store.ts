@@ -8,7 +8,6 @@ import type { AppData } from "../types/domain";
 export const appData: AppData = {
   catalogItems: {},
   stockItems: {},
-  inventoryTransactions: {},
   users: {},
   departments: {},
   locations: {},

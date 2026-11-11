@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Search, Bell, CircleHelp, Package, Building2, ShoppingCart, MapPin } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Search, Bell, CircleHelp, Package, Building2, ShoppingCart, MapPin, Menu, LogOut, KeyRound, UserPlus } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { permissionLabels, useAuth, usePermissions } from "../context/authValue";
+import { appData } from "../data/store";
 import { useData } from "../context/useData";
+import { ChangePasswordModal } from "./AccountForms";
 import { listLocations, listPurchaseOrders, listStockItems, listVendors } from "../lib/selectors";
 import { useSettings } from "../lib/settings";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
   "/inventory": "Inventory",
-  "/consumables": "Consumables",
   "/purchases": "Purchases",
   "/vendors": "Vendors",
   "/locations": "Locations",
@@ -16,7 +18,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "Settings",
 };
 
-type Panel = "search" | "alerts" | "help" | null;
+type Panel = "search" | "alerts" | "help" | "account" | null;
 
 interface SearchHit {
   key: string;
@@ -37,10 +39,16 @@ function Popover({ children, className = "" }: { children: ReactNode; className?
   );
 }
 
-export default function Header() {
+const initials = (name: string) =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+
+export default function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { revision } = useData();
+  // Subscribing re-renders the header (alerts, search results) after every data refresh.
+  useData();
+  const { user, signOut } = useAuth();
+  const [changingPassword, setChangingPassword] = useState(false);
   const settings = useSettings();
   const title = pageTitles[location.pathname] ?? "IT Inventory";
 
@@ -67,14 +75,13 @@ export default function Header() {
     setPanel(null);
   }
 
-  const alerts = useMemo(
-    () => listStockItems().filter((r) => r.status !== "ok").sort((a, b) => a.quantity - b.quantity),
-    // settings.lowStockThreshold changes which items are low.
-    [revision, settings.lowStockThreshold]
-  );
-  const alertCount = settings.lowStockAlerts ? alerts.length : 0;
+  const alerts = listStockItems().filter((r) => r.status !== "ok").sort((a, b) => a.quantity - b.quantity);
+  const { isAdmin } = usePermissions();
+  // Administrators are also told about sign-ups waiting for their approval.
+  const signupRequests = isAdmin ? Object.values(appData.users).filter((u) => u.status === "pending").length : 0;
+  const alertCount = (settings.lowStockAlerts ? alerts.length : 0) + signupRequests;
 
-  const hits = useMemo<SearchHit[]>(() => {
+  const hits: SearchHit[] = (() => {
     const term = query.trim().toLowerCase();
     if (!term) return [];
     const has = (...fields: string[]) => fields.some((f) => f.toLowerCase().includes(term));
@@ -100,7 +107,7 @@ export default function Header() {
       // Always offer the full inventory search as a final option.
       [{ key: "all", label: `Search inventory for “${query.trim()}”`, sub: "Show all matching items", icon: Search, to: `/inventory?q=${q}` }]
     );
-  }, [query, revision]);
+  })();
 
   function go(to: string) {
     setPanel(null);
@@ -111,15 +118,19 @@ export default function Header() {
   const iconButton = "relative rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900";
 
   return (
-    <header className="flex h-20 items-center justify-between border-b bg-white px-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+    <>
+    <header className="flex h-16 items-center justify-between gap-3 border-b bg-white px-4 sm:h-20 sm:px-8">
+      <div className="flex min-w-0 items-center gap-2">
+        <button onClick={onOpenMenu} aria-label="Open menu" className={`${iconButton} lg:hidden`}>
+          <Menu size={21} />
+        </button>
+        <h1 className="hidden truncate text-xl font-semibold text-slate-900 sm:block lg:text-2xl">{title}</h1>
       </div>
 
-      <div ref={rootRef} className="flex items-center gap-4">
+      <div ref={rootRef} className="flex min-w-0 items-center gap-2 sm:gap-4">
         {/* Search */}
-        <div className="relative">
-          <div className="flex h-10 w-96 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 focus-within:border-blue-400">
+        <div className="relative min-w-0">
+          <div className="flex h-10 w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 focus-within:border-blue-400 sm:w-64 sm:px-4 xl:w-96">
             <Search size={18} className="text-slate-500" />
             <input
               type="text"
@@ -132,13 +143,13 @@ export default function Header() {
                 const onlyOther = hits.length > 1 && !hits.some((h) => h.key.startsWith("s-"));
                 go(onlyOther ? hits[0].to : `/inventory?q=${encodeURIComponent(query.trim())}`);
               }}
-              placeholder="Search inventory, purchases, vendors, or anything..."
+              placeholder="Search everything..."
               aria-label="Search everything"
               className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
           </div>
           {panel === "search" && query.trim() && (
-            <Popover className="left-0 w-96">
+            <Popover className="left-0 w-[min(24rem,calc(100vw-2rem))]">
               <ul className="max-h-96 overflow-y-auto py-1">
                 {hits.length === 1 && (
                   <li className="px-4 py-2 text-xs text-gray-400">No direct matches.</li>
@@ -177,7 +188,16 @@ export default function Header() {
             )}
           </button>
           {panel === "alerts" && (
-            <Popover className="w-80">
+            <Popover className="w-[min(20rem,calc(100vw-2rem))]">
+              {signupRequests > 0 && (
+                <button
+                  onClick={() => go("/settings#users")}
+                  className="flex w-full items-center gap-3 border-b border-gray-100 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900 hover:bg-amber-100"
+                >
+                  <UserPlus size={16} className="shrink-0" />
+                  {signupRequests} sign-up request{signupRequests === 1 ? "" : "s"} to approve →
+                </button>
+              )}
               <div className="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900">Low-stock alerts</div>
               {!settings.lowStockAlerts ? (
                 <p className="px-4 py-4 text-sm text-gray-500">Alerts are turned off in Settings.</p>
@@ -216,14 +236,14 @@ export default function Header() {
             <CircleHelp size={21} />
           </button>
           {panel === "help" && (
-            <Popover className="w-80 p-4 text-sm text-gray-600">
+            <Popover className="w-[min(20rem,calc(100vw-2rem))] p-4 text-sm text-gray-600">
               <p className="mb-2 font-semibold text-gray-900">Quick guide</p>
               <ul className="list-disc space-y-1.5 pl-4">
-                <li><strong>Inventory</strong>: add items, and check out, return, or recount stock.</li>
+                <li><strong>Inventory</strong>: add, edit, and remove items; check out, return, or recount stock; see each item's history.</li>
                 <li><strong>Purchases</strong>: create orders, then <em>Receive</em> them to add stock.</li>
                 <li><strong>Vendors</strong> and <strong>Locations</strong>: manage suppliers and storage places.</li>
                 <li><strong>Reports</strong>: download spreadsheets (CSV).</li>
-                <li><strong>Settings</strong>: default location, low-stock threshold, support email.</li>
+                <li><strong>Settings</strong>: shared preferences, and (administrators) user accounts.</li>
               </ul>
               {settings.supportEmail && (
                 <a href={`mailto:${settings.supportEmail}`} className="mt-3 block font-medium text-blue-600 hover:underline">
@@ -233,7 +253,41 @@ export default function Header() {
             </Popover>
           )}
         </div>
+
+        {/* Signed-in user */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setPanel((p) => (p === "account" ? null : "account"))}
+            aria-label={`Account: ${user.name}`}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-400 text-xs font-semibold text-white hover:ring-2 hover:ring-purple-200"
+          >
+            {initials(user.name)}
+          </button>
+          {panel === "account" && (
+            <Popover className="w-64">
+              <div className="border-b border-gray-100 px-4 py-3">
+                <p className="truncate text-sm font-semibold text-gray-900">{user.name}</p>
+                <p className="truncate text-xs text-gray-500">{user.email}</p>
+                <p className="mt-1 text-xs text-gray-500">{user.role} · {permissionLabels[user.permission]}</p>
+              </div>
+              <button
+                onClick={() => { setPanel(null); setChangingPassword(true); }}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <KeyRound size={15} className="text-gray-400" /> Change password
+              </button>
+              <button
+                onClick={() => void signOut()}
+                className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <LogOut size={15} className="text-gray-400" /> Sign out
+              </button>
+            </Popover>
+          )}
+        </div>
       </div>
     </header>
+    {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
+    </>
   );
 }

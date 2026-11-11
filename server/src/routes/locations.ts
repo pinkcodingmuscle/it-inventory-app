@@ -34,7 +34,12 @@ locationsRouter.post(
   })
 );
 
-const updateSchema = createSchema.partial();
+const updateSchema = z.object({
+  name: z.string().min(1),
+  type: createSchema.shape.type,
+  managerUserId: z.string().uuid().nullable(),
+  notes: z.string().nullable(),
+}).partial();
 
 locationsRouter.patch(
   "/:id",

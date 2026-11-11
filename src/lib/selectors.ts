@@ -1,5 +1,5 @@
 import { appData } from "../data/store";
-import type { CatalogItem, ID, PurchaseOrder, PurchaseOrderStatus } from "../types/domain";
+import type { CatalogItem, CatalogItemType, ID, PurchaseOrder, PurchaseOrderStatus } from "../types/domain";
 import { getAvailableQuantity, getInUseQuantity, getReorderPoint, getStockStatus, type StockStatus } from "./inventory";
 import { loadSettings } from "./settings";
 
@@ -17,8 +17,14 @@ export const stockStatusLabels: Record<StockStatus, string> = {
   out: "Out",
 };
 
+/** Money everywhere in the app: Settings currency, always with cents (e.g. $70.50). */
 export function formatCurrency(amount: number): string {
-  return amount.toLocaleString("en-US", { style: "currency", currency: loadSettings().currency, maximumFractionDigits: 0 });
+  return amount.toLocaleString("en-US", {
+    style: "currency",
+    currency: loadSettings().currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function getCatalogItem(id: ID): CatalogItem | undefined {
@@ -31,6 +37,9 @@ function getCatalogItem(id: ID): CatalogItem | undefined {
 
 export interface StockRow {
   id: ID;
+  catalogItemId: ID;
+  locationId: ID;
+  type: CatalogItemType | undefined;
   name: string;
   category: string;
   quantity: number;
@@ -46,16 +55,20 @@ function toStockRow(itemId: ID): StockRow {
   const item = data.stockItems[itemId];
   const catalogItem = getCatalogItem(item.catalogItemId);
   const reorderPoint = getReorderPoint(item, data);
+  const status = getStockStatus(item.quantity, reorderPoint);
   return {
     id: item.id,
+    catalogItemId: item.catalogItemId,
+    locationId: item.locationId,
+    type: catalogItem?.type,
     name: catalogItem?.name ?? "Unknown item",
     category: catalogItem?.category ?? "",
     quantity: item.quantity,
-    available: getAvailableQuantity(item, data),
-    inUse: getInUseQuantity(item, data),
+    available: getAvailableQuantity(item),
+    inUse: getInUseQuantity(item),
     reorderPoint,
-    status: getStockStatus(item.quantity, reorderPoint),
-    statusLabel: stockStatusLabels[getStockStatus(item.quantity, reorderPoint)],
+    status,
+    statusLabel: stockStatusLabels[status],
     location: data.locations[item.locationId]?.name ?? "—",
   };
 }
@@ -71,23 +84,6 @@ export function getInventoryStats() {
     totalQty: rows.reduce((sum, r) => sum + r.quantity, 0),
     totalAvailable: rows.reduce((sum, r) => sum + r.available, 0),
     outOfStock: rows.filter((r) => r.status === "out").length,
-  };
-}
-
-/** Only the catalog items classified as consumables (cables, toner, batteries, ...). */
-export function listConsumables(): StockRow[] {
-  return listStockItems().filter((row) => {
-    const item = data.stockItems[row.id];
-    return getCatalogItem(item.catalogItemId)?.type === "consumable";
-  });
-}
-
-export function getConsumableStats() {
-  const rows = listConsumables();
-  return {
-    itemTypes: rows.length,
-    lowCount: rows.filter((r) => r.status === "low").length,
-    outCount: rows.filter((r) => r.status === "out").length,
   };
 }
 

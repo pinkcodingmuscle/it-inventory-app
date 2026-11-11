@@ -2,9 +2,9 @@ import { eq } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { catalogItems } from "../db/schema.js";
+import { catalogItems, inventoryTransactions, purchaseOrderLines, stockItems } from "../db/schema.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { NotFoundError } from "../lib/errors.js";
+import { ConflictError, NotFoundError } from "../lib/errors.js";
 import { toNumber } from "../lib/serialize.js";
 import { requirePermission } from "../middleware/auth.js";
 
@@ -46,7 +46,17 @@ catalogItemsRouter.post(
   })
 );
 
-const updateSchema = createSchema.partial();
+// null clears an optional field (e.g. remove a price or fall back to the default reorder point).
+const updateSchema = z.object({
+  name: z.string().min(1),
+  category: z.string().min(1),
+  type: createSchema.shape.type,
+  manufacturer: z.string().nullable(),
+  model: z.string().nullable(),
+  vendorId: z.string().uuid().nullable(),
+  reorderPoint: z.number().int().min(0).nullable(),
+  unitPrice: z.number().min(0).nullable(),
+}).partial();
 
 catalogItemsRouter.patch(
   "/:id",
@@ -55,10 +65,41 @@ catalogItemsRouter.patch(
     const body = updateSchema.parse(req.body);
     const [row] = await db
       .update(catalogItems)
-      .set({ ...body, unitPrice: body.unitPrice?.toString(), updatedAt: new Date() })
+      .set({
+        ...body,
+        unitPrice: body.unitPrice === undefined ? undefined : body.unitPrice === null ? null : body.unitPrice.toString(),
+        updatedAt: new Date(),
+      })
       .where(eq(catalogItems.id, req.params.id))
       .returning();
     if (!row) throw new NotFoundError("Catalog item not found");
     res.json(serialize(row));
+  })
+);
+
+// Only items that were never stocked, ordered, or moved can be deleted;
+// otherwise the history would lose its item names.
+catalogItemsRouter.delete(
+  "/:id",
+  requirePermission("administrator", "inventory_manager"),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const [stock] = await db.select({ id: stockItems.id }).from(stockItems).where(eq(stockItems.catalogItemId, id)).limit(1);
+    const [line] = await db
+      .select({ id: purchaseOrderLines.id })
+      .from(purchaseOrderLines)
+      .where(eq(purchaseOrderLines.catalogItemId, id))
+      .limit(1);
+    const [txn] = await db
+      .select({ id: inventoryTransactions.id })
+      .from(inventoryTransactions)
+      .where(eq(inventoryTransactions.catalogItemId, id))
+      .limit(1);
+    if (stock || line || txn) {
+      throw new ConflictError("This item has stock, orders, or history, so it can't be deleted.");
+    }
+    const [row] = await db.delete(catalogItems).where(eq(catalogItems.id, id)).returning();
+    if (!row) throw new NotFoundError("Catalog item not found");
+    res.status(204).end();
   })
 );

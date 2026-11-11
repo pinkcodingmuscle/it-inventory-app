@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -6,6 +5,7 @@ import {
 } from "recharts";
 import { Boxes, Package, CheckCircle2, AlertTriangle, XCircle, TrendingUp, FileText, Plus, ShoppingCart } from "lucide-react";
 import { DataState } from "../components/DataState";
+import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
 import { downloadStockOnHand } from "../lib/reports";
 import {
@@ -57,14 +57,16 @@ function DonutChart({ data, total, label }: { data: DonutEntry[]; total: number;
 }
 
 export function Dashboard() {
-  const { revision } = useData();
+  useData();
   const navigate = useNavigate();
-  const stats = useMemo(() => getDashboardStats(), [revision]);
-  const categoryData = useMemo(() => getStockByCategory(), [revision]);
-  const inventoryStatusData = useMemo(() => getInventoryStatusBreakdown(), [revision]);
-  const topLocations = useMemo(() => getTopLocations(5), [revision]);
-  const recentPurchases = useMemo(() => getRecentPurchases(5), [revision]);
-  const lowStock = useMemo(() => getLowStockTable(5), [revision]);
+  const { canManage } = usePermissions();
+  const actions = quickActions.filter((a) => canManage || !a.to.includes("new=1"));
+  const stats = getDashboardStats();
+  const categoryData = getStockByCategory();
+  const inventoryStatusData = getInventoryStatusBreakdown();
+  const topLocations = getTopLocations(5);
+  const recentPurchases = getRecentPurchases(5);
+  const lowStock = getLowStockTable(5);
 
   const inventoryItemCount = inventoryStatusData.reduce((sum, d) => sum + d.value, 0);
 
@@ -78,9 +80,9 @@ export function Dashboard() {
 
   return (
     <DataState>
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl p-4 sm:p-8">
       {/* Header with action buttons */}
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-gray-500">Overview of your IT inventory, stock levels, and purchasing.</p>
         </div>
@@ -92,17 +94,19 @@ export function Dashboard() {
           >
             <FileText size={15} /> Export Report
           </button>
-          <button
-            onClick={() => navigate("/inventory?new=1")}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            <Plus size={15} /> Add New
-          </button>
+          {canManage && (
+            <button
+              onClick={() => navigate("/inventory?new=1")}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <Plus size={15} /> Add New
+            </button>
+          )}
         </div>
       </div>
 
       {/* Stat cards + Total Inventory Value */}
-      <div className="mb-5 grid grid-cols-6 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
@@ -126,7 +130,7 @@ export function Dashboard() {
       </div>
 
       {/* Donut charts + Top Locations + Recent Purchases */}
-      <div className="mb-5 grid grid-cols-4 gap-5">
+      <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="mb-3 text-sm font-semibold text-gray-900">Units by Category</p>
           <DonutChart data={categoryData} total={stats.totalUnits} label="Units" />
@@ -169,13 +173,13 @@ export function Dashboard() {
       </div>
 
       {/* Low stock table + Quick Actions */}
-      <div className="grid grid-cols-4 gap-5">
-        <div className="col-span-3 rounded-xl border border-gray-200 bg-white">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-4">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white xl:col-span-3">
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <p className="text-sm font-semibold text-gray-900">Items Needing Reorder</p>
             <button onClick={() => navigate("/inventory?status=reorder")} className="text-xs text-blue-600 hover:underline">View all</button>
           </div>
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[40rem] text-sm">
             <thead className="border-b border-gray-100 bg-gray-50 text-xs font-medium uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-5 py-3 text-left">Item</th>
@@ -212,7 +216,7 @@ export function Dashboard() {
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="mb-4 text-sm font-semibold text-gray-900">Quick Actions</p>
           <div className="space-y-3">
-            {quickActions.map((action) => {
+            {actions.map((action) => {
               const Icon = action.icon;
               return (
                 <button key={action.label} onClick={() => navigate(action.to)} className="flex w-full items-center gap-3 rounded-lg border border-gray-100 p-3 text-left hover:bg-gray-50">

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { inventoryTransactions, stockItems } from "../db/schema.js";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors.js";
@@ -7,21 +7,67 @@ type Executor = Pick<typeof db, "select">;
 
 // `stock_items.quantity` is the total quantity owned (on-hand + checked out),
 // not just what's sitting on the shelf. "Available" is derived from the
-// checkout/return ledger in `inventory_transactions` (see src/lib/inventory.ts
-// on the frontend). Checkout and return therefore only append transactions;
+// checkout/return ledger in `inventory_transactions`; GET /api/stock returns
+// it per line as `checkedOut`. Checkout and return therefore only append transactions;
 // only a physical count correction (`adjust`) or a purchase-order receipt
 // changes `quantity` itself.
+// Net units checked out = sum(checkout) - sum(return), summed in the database
+// rather than by loading every transaction row.
+const checkedOutExpr = sql<number>`greatest(0, coalesce(sum(case
+  when ${inventoryTransactions.type} = 'checkout' then ${inventoryTransactions.quantity}
+  when ${inventoryTransactions.type} = 'return' then -${inventoryTransactions.quantity}
+  else 0 end), 0))::int`;
+
 async function getCheckedOutQuantity(tx: Executor, catalogItemId: string, locationId: string): Promise<number> {
-  const rows = await tx
-    .select({ type: inventoryTransactions.type, quantity: inventoryTransactions.quantity })
+  const [row] = await tx
+    .select({ checkedOut: checkedOutExpr })
     .from(inventoryTransactions)
     .where(and(eq(inventoryTransactions.catalogItemId, catalogItemId), eq(inventoryTransactions.locationId, locationId)));
-  let checkedOut = 0;
-  for (const row of rows) {
-    if (row.type === "checkout") checkedOut += row.quantity;
-    if (row.type === "return") checkedOut -= row.quantity;
-  }
-  return Math.max(0, checkedOut);
+  return Number(row?.checkedOut ?? 0);
+}
+
+/** Every stock line with how many of its units are currently checked out. */
+export async function listStockWithCheckedOut() {
+  const [rows, totals] = await Promise.all([
+    db.select().from(stockItems),
+    db
+      .select({
+        catalogItemId: inventoryTransactions.catalogItemId,
+        locationId: inventoryTransactions.locationId,
+        checkedOut: checkedOutExpr,
+      })
+      .from(inventoryTransactions)
+      .where(inArray(inventoryTransactions.type, ["checkout", "return"]))
+      .groupBy(inventoryTransactions.catalogItemId, inventoryTransactions.locationId),
+  ]);
+  const byKey = new Map(totals.map((t) => [`${t.catalogItemId}|${t.locationId}`, Number(t.checkedOut)]));
+  return rows.map((row) => ({ ...row, checkedOut: byKey.get(`${row.catalogItemId}|${row.locationId}`) ?? 0 }));
+}
+
+/** Changes a stock line's own reorder point (null = use the catalog item's / the default). */
+export async function updateStockItem(stockItemId: string, input: { reorderPoint?: number | null }) {
+  const [row] = await db
+    .update(stockItems)
+    .set({ ...input, updatedAt: new Date() })
+    .where(eq(stockItems.id, stockItemId))
+    .returning();
+  if (!row) throw new NotFoundError("Stock item not found");
+  return row;
+}
+
+/**
+ * Stops tracking an item at a location. Only allowed once its quantity is 0;
+ * its transaction history is kept (it references the catalog item and location).
+ */
+export async function deleteStockItem(stockItemId: string) {
+  return db.transaction(async (tx) => {
+    const [item] = await tx.select().from(stockItems).where(eq(stockItems.id, stockItemId)).for("update");
+    if (!item) throw new NotFoundError("Stock item not found");
+    if (item.quantity !== 0) {
+      throw new ConflictError("Recount this item to 0 before removing it from this location.");
+    }
+    await tx.delete(stockItems).where(eq(stockItems.id, stockItemId));
+  });
 }
 
 /**

@@ -15,7 +15,9 @@
     "server:dev": "npm --prefix server run dev",
     "db:migrate": "npm --prefix server run db:migrate",
     "db:seed": "npm --prefix server run db:seed",
-    "db:import": "npm --prefix server run db:import --"
+    "db:import": "npm --prefix server run db:import --",
+    "user:set-password": "npm --prefix server run user:set-password --",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -29,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

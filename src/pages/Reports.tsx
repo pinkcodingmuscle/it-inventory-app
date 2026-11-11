@@ -10,7 +10,7 @@ interface ReportDef {
   tag: string;
   dateRange: boolean;
   /** Downloads the CSV and returns how many rows it contained. */
-  run: (from?: string, to?: string) => number;
+  run: (from?: string, to?: string) => number | Promise<number>;
 }
 
 const reports: ReportDef[] = [
@@ -58,12 +58,21 @@ function ReportCard({ report }: { report: ReportDef }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [result, setResult] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const Icon = report.icon;
   const badRange = Boolean(from && to && from > to);
 
-  function generate() {
-    const rows = report.run(from || undefined, to || undefined);
-    setResult(rows === 0 ? "Downloaded — no rows matched, so the file only has headers." : `Downloaded ${rows} row${rows === 1 ? "" : "s"}.`);
+  async function generate() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const rows = await report.run(from || undefined, to || undefined);
+      setResult(rows === 0 ? "Downloaded — no rows matched, so the file only has headers." : `Downloaded ${rows} row${rows === 1 ? "" : "s"}.`);
+    } catch (err) {
+      setResult(err instanceof Error ? `Couldn't build the report: ${err.message}` : "Couldn't build the report.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -95,11 +104,11 @@ function ReportCard({ report }: { report: ReportDef }) {
       <div className="mt-auto pt-5">
         <button
           onClick={generate}
-          disabled={badRange}
+          disabled={badRange || busy}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
         >
           <Download size={14} />
-          Generate Report
+          {busy ? "Preparing…" : "Generate Report"}
         </button>
         <p className="mt-2 min-h-4 text-center text-xs text-gray-500" aria-live="polite">
           {badRange ? "“From” must be on or before “To”." : result ?? (report.dateRange ? "Leave dates empty for all time." : "")}
@@ -112,12 +121,12 @@ function ReportCard({ report }: { report: ReportDef }) {
 export default function Reports() {
   return (
     <DataState>
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl p-4 sm:p-8">
       <div className="mb-8">
         <p className="text-gray-500">Generate and export inventory reports as spreadsheets (CSV, opens in Excel).</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {reports.map((report) => <ReportCard key={report.name} report={report} />)}
       </div>
     </div>

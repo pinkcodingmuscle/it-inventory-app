@@ -1,4 +1,5 @@
 import { appData as data } from "../data/store";
+import { fetchTransactions } from "./api";
 import { getPurchaseOrderTotal, listStockItems, purchaseOrderStatusLabels } from "./selectors";
 
 type Cell = string | number | null | undefined;
@@ -60,11 +61,10 @@ export function downloadLowStock() {
   return rows.length;
 }
 
-export function downloadStockMovement(from?: string, to?: string) {
-  const rows = Object.values(data.inventoryTransactions)
-    .filter((t) => (!from || t.createdAt.slice(0, 10) >= from) && (!to || t.createdAt.slice(0, 10) <= to))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((t) => [
+/** Fetches just the requested date range from the API (the history isn't kept in the browser). */
+export async function downloadStockMovement(from?: string, to?: string) {
+  const transactions = await fetchTransactions({ from, to });
+  const rows = transactions.map((t) => [
       new Date(t.createdAt).toLocaleString("en-US"),
       t.type,
       data.catalogItems[t.catalogItemId]?.name,
