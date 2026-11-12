@@ -2,11 +2,9 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { setAppData } from "../data/store";
 import { fetchAppData, saveSettingsToServer } from "../lib/api";
 import { setCurrentSettings, takeLegacyLocalSettings } from "../lib/settings";
-import { usePermissions } from "./authValue";
 import { DataContext } from "./contextValue";
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { canManage } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
@@ -19,7 +17,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setAppData(data);
       let current = settings.settings;
       // One-time move of settings saved in this browser by older versions of the app.
-      if (!settings.saved && canManage) {
+      if (!settings.saved) {
         const legacy = takeLegacyLocalSettings();
         if (legacy) current = (await saveSettingsToServer(legacy).catch(() => settings)).settings;
       }
@@ -30,7 +28,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [canManage]);
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {

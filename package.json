@@ -16,7 +16,6 @@
     "db:migrate": "npm --prefix server run db:migrate",
     "db:seed": "npm --prefix server run db:seed",
     "db:import": "npm --prefix server run db:import --",
-    "user:set-password": "npm --prefix server run user:set-password --",
     "test:e2e": "playwright test"
   },
   "dependencies": {

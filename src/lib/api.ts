@@ -1,5 +1,4 @@
 import type {
-  Actor,
   AppData,
   CatalogItem,
   Department,
@@ -14,52 +13,17 @@ import type {
 import { byId } from "./byId";
 import type { AppSettings } from "./settings";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
-
-// ---------------------------------------------------------------------------
-// Session token
-// ---------------------------------------------------------------------------
-
-const TOKEN_KEY = "it-inventory:session";
-/** Fired when the API rejects the session (expired, signed out elsewhere, user deactivated). */
-export const SIGNED_OUT_EVENT = "it-inventory:signed-out";
-
-export function getToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setToken(token: string | null) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Storage blocked: the session lasts until the tab is reloaded.
-  }
-  memoryToken = token;
-}
-
-let memoryToken: string | null = getToken();
+// In production the API is served from the same site (Netlify Function at
+// /api); in development it's the local Express server.
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:4000/api" : "/api");
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = memoryToken;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
+    headers: { "Content-Type": "application/json", ...init?.headers },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    if (res.status === 401 && token && !path.startsWith("/auth/login")) {
-      setToken(null);
-      window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
-    }
     // Zod validation failures carry per-field messages; surface the first one.
     const fieldErrors: Record<string, string[] | undefined> = body.details?.fieldErrors ?? {};
     const firstField = Object.entries(fieldErrors).find(([, msgs]) => msgs?.length);
@@ -77,38 +41,6 @@ const send = <T>(method: string, path: string, body?: unknown) =>
 const post = <T>(path: string, body?: unknown) => send<T>("POST", path, body);
 const patch = <T>(path: string, body: unknown) => send<T>("PATCH", path, body);
 const del = (path: string) => send<void>("DELETE", path);
-
-// ---------------------------------------------------------------------------
-// Auth
-// ---------------------------------------------------------------------------
-
-export async function login(email: string, password: string): Promise<Actor> {
-  const res = await post<{ token: string; user: Actor }>("/auth/login", { email, password });
-  setToken(res.token);
-  return res.user;
-}
-
-/** Requests an account. It can't sign in until an administrator approves it. */
-export async function signup(name: string, email: string, password: string): Promise<void> {
-  await post("/auth/signup", { name, email, password });
-}
-
-export async function fetchCurrentUser(): Promise<Actor> {
-  return (await apiFetch<{ user: Actor }>("/auth/me")).user;
-}
-
-export async function logout() {
-  try {
-    await post("/auth/logout");
-  } finally {
-    setToken(null);
-  }
-}
-
-export async function changePassword(currentPassword: string, newPassword: string) {
-  const res = await post<{ token: string }>("/auth/change-password", { currentPassword, newPassword });
-  setToken(res.token);
-}
 
 // ---------------------------------------------------------------------------
 // Bulk load
@@ -312,32 +244,4 @@ export function receivePurchaseOrder(
 
 export function cancelPurchaseOrder(purchaseOrderId: string) {
   return post<PurchaseOrder>(`/purchase-orders/${purchaseOrderId}/cancel`);
-}
-
-// ---------------------------------------------------------------------------
-// Users (administrators only)
-// ---------------------------------------------------------------------------
-
-export interface CreateUserInput {
-  name: string;
-  email: string;
-  role: string;
-  password?: string;
-}
-
-export function createUser(input: CreateUserInput): Promise<User> {
-  return post<User>("/users", input);
-}
-
-export function updateUser(id: string, input: Partial<{ name: string; email: string; role: string; status: "active" | "inactive" }>) {
-  return patch<User>(`/users/${id}`, input);
-}
-
-export function setUserPassword(id: string, password: string) {
-  return post<User>(`/users/${id}/password`, { password });
-}
-
-/** Declines a sign-up request (only pending accounts can be deleted). */
-export function deleteUser(id: string) {
-  return del(`/users/${id}`);
 }

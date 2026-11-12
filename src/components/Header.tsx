@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Search, Bell, CircleHelp, Package, Building2, ShoppingCart, MapPin, Menu, LogOut, KeyRound, UserPlus } from "lucide-react";
+import { Search, Bell, CircleHelp, Package, Building2, ShoppingCart, MapPin, Menu } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { permissionLabels, useAuth, usePermissions } from "../context/authValue";
-import { appData } from "../data/store";
 import { useData } from "../context/useData";
-import { ChangePasswordModal } from "./AccountForms";
 import { listLocations, listPurchaseOrders, listStockItems, listVendors } from "../lib/selectors";
 import { useSettings } from "../lib/settings";
 
@@ -18,7 +15,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "Settings",
 };
 
-type Panel = "search" | "alerts" | "help" | "account" | null;
+type Panel = "search" | "alerts" | "help" | null;
 
 interface SearchHit {
   key: string;
@@ -39,16 +36,11 @@ function Popover({ children, className = "" }: { children: ReactNode; className?
   );
 }
 
-const initials = (name: string) =>
-  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
-
 export default function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   // Subscribing re-renders the header (alerts, search results) after every data refresh.
   useData();
-  const { user, signOut } = useAuth();
-  const [changingPassword, setChangingPassword] = useState(false);
   const settings = useSettings();
   const title = pageTitles[location.pathname] ?? "IT Inventory";
 
@@ -76,10 +68,7 @@ export default function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
   }
 
   const alerts = listStockItems().filter((r) => r.status !== "ok").sort((a, b) => a.quantity - b.quantity);
-  const { isAdmin } = usePermissions();
-  // Administrators are also told about sign-ups waiting for their approval.
-  const signupRequests = isAdmin ? Object.values(appData.users).filter((u) => u.status === "pending").length : 0;
-  const alertCount = (settings.lowStockAlerts ? alerts.length : 0) + signupRequests;
+  const alertCount = settings.lowStockAlerts ? alerts.length : 0;
 
   const hits: SearchHit[] = (() => {
     const term = query.trim().toLowerCase();
@@ -118,7 +107,6 @@ export default function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
   const iconButton = "relative rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900";
 
   return (
-    <>
     <header className="flex h-16 items-center justify-between gap-3 border-b bg-white px-4 sm:h-20 sm:px-8">
       <div className="flex min-w-0 items-center gap-2">
         <button onClick={onOpenMenu} aria-label="Open menu" className={`${iconButton} lg:hidden`}>
@@ -189,15 +177,6 @@ export default function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
           </button>
           {panel === "alerts" && (
             <Popover className="w-[min(20rem,calc(100vw-2rem))]">
-              {signupRequests > 0 && (
-                <button
-                  onClick={() => go("/settings#users")}
-                  className="flex w-full items-center gap-3 border-b border-gray-100 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900 hover:bg-amber-100"
-                >
-                  <UserPlus size={16} className="shrink-0" />
-                  {signupRequests} sign-up request{signupRequests === 1 ? "" : "s"} to approve →
-                </button>
-              )}
               <div className="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900">Low-stock alerts</div>
               {!settings.lowStockAlerts ? (
                 <p className="px-4 py-4 text-sm text-gray-500">Alerts are turned off in Settings.</p>
@@ -243,7 +222,7 @@ export default function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
                 <li><strong>Purchases</strong>: create orders, then <em>Receive</em> them to add stock.</li>
                 <li><strong>Vendors</strong> and <strong>Locations</strong>: manage suppliers and storage places.</li>
                 <li><strong>Reports</strong>: download spreadsheets (CSV).</li>
-                <li><strong>Settings</strong>: shared preferences, and (administrators) user accounts.</li>
+                <li><strong>Settings</strong>: shared preferences (default location, low-stock threshold, support email).</li>
               </ul>
               {settings.supportEmail && (
                 <a href={`mailto:${settings.supportEmail}`} className="mt-3 block font-medium text-blue-600 hover:underline">
@@ -254,40 +233,7 @@ export default function Header({ onOpenMenu }: { onOpenMenu: () => void }) {
           )}
         </div>
 
-        {/* Signed-in user */}
-        <div className="relative shrink-0">
-          <button
-            onClick={() => setPanel((p) => (p === "account" ? null : "account"))}
-            aria-label={`Account: ${user.name}`}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-400 text-xs font-semibold text-white hover:ring-2 hover:ring-purple-200"
-          >
-            {initials(user.name)}
-          </button>
-          {panel === "account" && (
-            <Popover className="w-64">
-              <div className="border-b border-gray-100 px-4 py-3">
-                <p className="truncate text-sm font-semibold text-gray-900">{user.name}</p>
-                <p className="truncate text-xs text-gray-500">{user.email}</p>
-                <p className="mt-1 text-xs text-gray-500">{user.role} · {permissionLabels[user.permission]}</p>
-              </div>
-              <button
-                onClick={() => { setPanel(null); setChangingPassword(true); }}
-                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <KeyRound size={15} className="text-gray-400" /> Change password
-              </button>
-              <button
-                onClick={() => void signOut()}
-                className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <LogOut size={15} className="text-gray-400" /> Sign out
-              </button>
-            </Popover>
-          )}
-        </div>
       </div>
     </header>
-    {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
-    </>
   );
 }

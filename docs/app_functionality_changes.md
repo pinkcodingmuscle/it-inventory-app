@@ -7,9 +7,10 @@ This covers the last three commits on `main`, oldest first, then the setup work 
 | `e7d67a0` | 2026-11-09 | Narrowed scope to stock inventory, dropped the asset/software tables, single root `.env`, Neon-ready database client |
 | `7c02d40` | 2026-11-09 | Neon agent skills and MCP config; moved Render to the same region as Neon |
 | `0c9e36f` | 2026-11-10 | Inventory management UI: add stock, check out/return/recount, vendors, purchase orders, CSV reports, settings, search and alerts |
-| *(uncommitted)* | 2026-11-10 | Sign-in and sign-up, editing and deleting, item history, shared settings, phone layout, faster loading, browser tests |
+| `a816ef0` | 2026-11-11 | Sign-in and sign-up, editing and deleting, item history, shared settings, phone layout, faster loading, browser tests (branch `feature/auth-editing-settings`) |
+| *(uncommitted)* | 2026-11-11 | Hosting moved from Render to Netlify Functions; sign-in, sign-up and user management removed |
 
-Where something is already documented, this file links to that document instead of repeating it. Section 4 covers connecting to Neon and loading the data. Section 5 covers the uncommitted changes. Section 6 lists existing docs that are now out of date.
+Where something is already documented, this file links to that document instead of repeating it. Section 4 covers connecting to Neon and loading the data. Section 5 covers commit `a816ef0`. Section 6 covers the move from Render to Netlify. Section 7 covers removing sign-in. Section 8 lists existing docs that are now out of date.
 
 ## 1. `e7d67a0`: Inventory-only scope and Neon-ready configuration
 
@@ -152,9 +153,10 @@ No code changed for this; it is setup on your machine and in Neon.
 - **`.env`:** `DATABASE_URL` now points at the Neon database. `DATABASE_URL_UNPOOLED`, `NEON_BRANCH`, `NEON_BRANCH_ID` and `NEON_FUNCTION_HOST_SUFFIX` were also added. Your previous local `DATABASE_URL` was replaced, so running the API with no other settings now uses **Neon, not Docker**. To work against local data, prefix commands with the local URL, e.g. `DATABASE_URL=postgresql://inventory_app:local_development_password@localhost:5432/it_inventory npm run server:dev`.
 - **Neon schema and data:** the migrations were run against Neon, and `IT Inventory Workbook.xlsx` was imported with `--replace`: 59 rows and no errors.
 - **The "Unknown or inactive actor" error** had two causes. Before the import, the Neon `users` table was empty, so the old development identity stub (§5.1) had no user to act as. After the import, the API server had stopped, so it was restarted.
-- **Not done yet:** `DATABASE_URL` still needs to be set in the Render dashboard (README, deployment step 3).
+- **Migrations 0003 and 0004** were applied to Neon on 2026-11-11 (all 5 migrations now applied; the 59 stock rows were unchanged).
+- Render was later dropped in favour of Netlify (§6), so the Render `DATABASE_URL` step no longer applies.
 
-## 5. Uncommitted: sign-in and sign-up, editing, shared settings, phone layout
+## 5. `a816ef0`: sign-in and sign-up, editing, shared settings, phone layout
 
 ### 5.1 Sign-in and permissions
 
@@ -260,13 +262,63 @@ The Consumables page duplicated Inventory with fewer features. It is now a *Type
 
 ### 5.9 Before deploying
 
-1. Apply migrations `0003` and `0004` to Neon. Render does this automatically on deploy (`preDeployCommand`). Locally, run `npm run db:migrate`; your `.env` points at Neon, so that migrates Neon.
+1. Apply migrations `0003` and `0004` to Neon. *(Done on 2026-11-11. Netlify builds now run pending migrations automatically; see §6.)*
 2. Create your administrator sign-in on Neon: `npm run user:set-password -- you@example.com --name "Your Name"`. The only user there now is the "Data Importer", which has no password.
 3. Add the other staff in **Settings → Users**.
 
 Until the migration runs, the new API code will fail against Neon (missing tables). Until step 2, nobody can sign in.
 
-## 6. Existing docs that are now out of date
+## 6. Uncommitted: hosting moved from Render to Netlify Functions
+
+Render is no longer used. One Netlify site now serves both the frontend and the API. **Already documented** in the [README](../README.md#deployment-netlify--neon-postgres) (setup steps and notes).
+
+- **New files:**
+  - [`netlify.toml`](../netlify.toml): build command, publish folder, functions folder, Node 22, the `/api/*` → function rewrite, and the single-page-app fallback
+  - [`netlify/functions/api.ts`](../netlify/functions/api.ts): the function entry point
+  - [`server/src/netlify.ts`](../server/src/netlify.ts): wraps the unchanged Express app with `serverless-http` (new server dependency)
+- **Removed:**
+  - `render.yaml`
+  - `public/_redirects`, whose single-page-app rule moved into `netlify.toml`. It had to move: the `/api/*` rule must come before the catch-all, and Netlify applies `_redirects` first.
+- **Migrations:** they run during each Netlify build (`npm run db:migrate` in the build command), replacing Render's `preDeployCommand`.
+- **Frontend:** the default API address is `/api` in production builds and `http://localhost:4000/api` in development. `VITE_API_URL` still overrides both.
+- **Server:**
+  - `env.ts` no longer fails when there's no `.env` file to read.
+  - The connection pool holds 3 connections inside a function (10 elsewhere); `PG_POOL_MAX` overrides it.
+  - Two comments no longer mention Render.
+- **CORS:** the app and API share an origin, so `CORS_ORIGIN` isn't needed in production. It's still used locally.
+- **How it was checked:** I couldn't run the Netlify CLI, so the function was bundled with esbuild the way Netlify does it, in both CommonJS and ES-module form (with Netlify's `createRequire` shim). Each bundle was called with Netlify-style events against a throwaway local database:
+  - health on both path forms: 200
+  - stock without a session: 401
+  - sign-in: 200
+  - stock with a session: 200 (59 rows)
+  - sign-up: 201
+  - settings: 200
+
+  The real Netlify build hasn't run yet; that happens on the first deploy.
+
+## 7. Uncommitted: sign-in removed
+
+Only two people in the department use the app, so sign-in was removed. **This undoes §5.1** (sign-in, sign-up, approval, user management, permission tiers). The editing, history, shared settings, phone layout and performance work from §5 stays. **Already documented** in the [README](../README.md#access-no-sign-in).
+
+> **Anyone with the site's address can view, change and delete the inventory.** Keep the Netlify link private.
+
+- **Server:**
+  - Every request now acts as one shared **"IT Department"** user (`it-department@local.invalid`), which the API creates the first time it runs ([`middleware/auth.ts`](../server/src/middleware/auth.ts)). Transactions still need a user, so the history shows "IT Department" as *By*.
+  - Removed: the `/api/auth/*` endpoints; sessions; password hashing; the sign-up and user-management endpoints (`POST`/`PATCH`/`DELETE /api/users`, `POST /api/users/:id/password`); the per-route permission checks; the sign-in rate limits; and the `user:set-password` script.
+  - `GET /api/users` stays read-only, for names in the history and location managers.
+  - `trust proxy` was removed; it existed only for the sign-in rate limit.
+- **Database:** migration [`0005_remove_sign_in.sql`](../server/migrations/0005_remove_sign_in.sql) drops the `sessions` table and the `users.password_hash` column, and turns any leftover `pending` users into `inactive`. It keeps `app_settings`.
+  - It has **not** been applied to Neon yet. It runs on the next `npm run db:migrate` or Netlify build.
+  - The app works before it's applied too: the new code simply doesn't use those columns.
+- **Frontend:**
+  - Removed: the sign-in and *Create account* page, the account menu (*Change password*, *Sign out*), Settings → Users and the sign-up requests on the bell.
+  - Every button is shown to everyone, since there are no longer permission tiers to hide them by.
+  - The API client no longer sends a session token.
+- **Tests:**
+  - Server: 26 pass. A new [`features.test.ts`](../server/src/test/features.test.ts) covers open access, the shared user, settings, editing and deleting, and history. The sign-in tests were removed with the code.
+  - Browser: 8 pass, including a new "opens straight to the Dashboard" test. They no longer need test accounts.
+
+## 8. Existing docs that are now out of date
 
 These docs were not updated by the three commits. They are proposals, so they can stay as historical records, but they no longer describe the code:
 
@@ -275,5 +327,6 @@ These docs were not updated by the three commits. They are proposals, so they ca
   - The endpoint list in §8 still includes asset and software routes, and doesn't include `POST /api/stock` or `POST /api/purchase-orders/:id/cancel`.
 - [data-structure-proposal.md](data-structure-proposal.md): §3.3, §3.8 and §3.9 describe serialized assets, software licenses and lifecycle history.
 - [excel-import-proposal.md](excel-import-proposal.md): §2 says rows with an asset tag or serial number become `assets` records. They are now skipped.
-- [low-cost-business-deployment-proposal.md](low-cost-business-deployment-proposal.md): recommends Render PostgreSQL. Production now uses Neon (see the README).
-- [database-persistence-proposal.md](database-persistence-proposal.md) §8 also lacks the endpoints in §5 (auth, settings, the new `PATCH`/`DELETE` routes). §10 describes permissions as planned; they are now enforced with real sign-in.
+- [low-cost-business-deployment-proposal.md](low-cost-business-deployment-proposal.md): recommends a Render API and Render PostgreSQL. Production now uses Netlify Functions for the API and Neon for the database (see the README).
+- [database-persistence-proposal.md](database-persistence-proposal.md) §8 also lacks the settings endpoints and the new `PATCH`/`DELETE` routes. §10 describes permissions as planned; there is now no sign-in and no permission checks (see §7).
+- [barcode-scanning-proposal.md](barcode-scanning-proposal.md) §4.3: updated to drop the `requirePermission` guard, which no longer exists.

@@ -1,0 +1,32 @@
+# Netlify hosts both halves of the app on one site:
+#   - the React frontend (static files from dist/)
+#   - the Express API as a serverless function, served at /api/*
+# Set DATABASE_URL in Site configuration -> Environment variables (see README).
+
+[build]
+  # Install the API's dependencies too (the function imports them), apply any
+  # pending database migrations, then build the frontend.
+  command = "npm ci --prefix server --include=dev && npm run db:migrate && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # Optional native driver that pg only loads if installed; never bundle it.
+  external_node_modules = ["pg-native"]
+
+# The API. Must come before the single-page-app fallback below.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# Single-page app: every other path serves index.html (React Router handles it).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -1,5 +1,7 @@
 # IT Inventory Application: Low-Cost Business Deployment Proposal
 
+> **Superseded.** The app now deploys entirely on Netlify (the API runs as a Netlify Function) with Neon Postgres. See the README's Deployment section. This proposal is kept as a historical record.
+
 ## 1. Recommendation
 
 Deploy the application using:

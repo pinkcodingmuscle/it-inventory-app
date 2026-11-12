@@ -71,7 +71,7 @@ Add `receiveStock(catalogItemId, locationId, quantity, performedByUserId, notes?
 4. Insert an `inventory_transactions` row with `type: "receipt"` and a null `relatedPurchaseOrderId`. No constraint change is needed.
 5. Return `{ stockItem, transaction }`, the same shape as the other stock services.
 
-Guard the route with `requirePermission("administrator", "inventory_manager")`. Validate the body with zod: `quantity` must be a positive integer, and both IDs must be UUIDs.
+There is no sign-in, so the route needs no permission guard; record `req.actor` as the performer. Validate the body with zod: `quantity` must be a positive integer, and both IDs must be UUIDs.
 
 Add tests to `server/src/test/stock.test.ts` for three cases: an existing stock row, a new location (the insert path), and an invalid quantity.
 

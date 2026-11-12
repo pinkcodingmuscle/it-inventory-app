@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Search, Plus, Building2, Pencil } from "lucide-react";
 import { DataState } from "../components/DataState";
 import { Field, FormError, Modal, inputClass, primaryButtonClass, secondaryButtonClass } from "../components/Modal";
-import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
 import { appData } from "../data/store";
 import { createVendor, deleteVendor, updateVendor } from "../lib/api";
@@ -145,7 +144,6 @@ function VendorModal({ vendor, onClose }: { vendor?: Vendor; onClose: () => void
 
 export default function Vendors() {
   useData();
-  const { canManage } = usePermissions();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Vendor | "new" | null>(null);
 
@@ -175,15 +173,13 @@ export default function Vendors() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
           />
         </div>
-        {canManage && (
-          <button
-            onClick={() => setEditing("new")}
-            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            <Plus size={16} />
-            Add Vendor
-          </button>
-        )}
+        <button
+          onClick={() => setEditing("new")}
+          className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Plus size={16} />
+          Add Vendor
+        </button>
       </div>
 
       <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -220,23 +216,21 @@ export default function Vendors() {
                 <td className="px-6 py-4 text-gray-500">{vendor.phone}</td>
                 <td className="px-6 py-4 text-gray-600">{vendor.suppliedCount}</td>
                 <td className="px-6 py-4 text-right">
-                  {canManage && (
-                    <button
-                      onClick={() => setEditing(appData.vendors[vendor.id])}
-                      aria-label={`Edit ${vendor.name}`}
-                      title="Edit"
-                      className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setEditing(appData.vendors[vendor.id])}
+                    aria-label={`Edit ${vendor.name}`}
+                    title="Edit"
+                    className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <Pencil size={14} />
+                  </button>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">
-                  {vendorData.length === 0 ? (canManage ? "No vendors yet. Click Add Vendor to create one." : "No vendors yet.") : "No vendors match your search."}
+                  {vendorData.length === 0 ? "No vendors yet. Click Add Vendor to create one." : "No vendors match your search."}
                 </td>
               </tr>
             )}

@@ -33,12 +33,9 @@ export const users = pgTable(
     role: text("role").notNull(),
     departmentId: uuid("department_id").references(() => departments.id, { onDelete: "set null" }),
     status: text("status").notNull().default("active"),
-    // scrypt hash ("scrypt$<salt>$<hash>"). Null means the user can't sign in yet.
-    passwordHash: text("password_hash"),
     ...timestamps,
   },
-  // 'pending' = signed up through the app and waiting for an administrator to approve.
-  (table) => [check("users_status_check", sql`${table.status} IN ('active', 'inactive', 'pending')`)]
+    (table) => [check("users_status_check", sql`${table.status} IN ('active', 'inactive')`)]
 );
 
 export const locations = pgTable(
@@ -192,22 +189,6 @@ export const inventoryTransactions = pgTable(
     index("inventory_transactions_catalog_location_idx").on(table.catalogItemId, table.locationId),
     index("inventory_transactions_created_at_idx").on(table.createdAt),
   ]
-);
-
-// Signed-in browser sessions. Only a SHA-256 hash of the bearer token is stored,
-// so a leaked database dump can't be used to impersonate anyone.
-export const sessions = pgTable(
-  "sessions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    tokenHash: text("token_hash").notNull().unique(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  },
-  (table) => [index("sessions_user_id_idx").on(table.userId)]
 );
 
 // Organisation-wide preferences (one row, id = 'default'), shared by every user.

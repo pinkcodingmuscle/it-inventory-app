@@ -5,7 +5,6 @@ import { db } from "../db/client.js";
 import { locations, stockItems } from "../db/schema.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { ConflictError, NotFoundError } from "../lib/errors.js";
-import { requirePermission } from "../middleware/auth.js";
 
 export const locationsRouter = Router();
 
@@ -26,7 +25,6 @@ const createSchema = z.object({
 
 locationsRouter.post(
   "/",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = createSchema.parse(req.body);
     const [row] = await db.insert(locations).values(body).returning();
@@ -43,7 +41,6 @@ const updateSchema = z.object({
 
 locationsRouter.patch(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = updateSchema.parse(req.body);
     const [row] = await db
@@ -60,7 +57,6 @@ locationsRouter.patch(
 // (section 11 of the persistence proposal).
 locationsRouter.delete(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const locationId = req.params.id;
     const [stockAtLocation] = await db

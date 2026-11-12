@@ -55,21 +55,7 @@ export interface User {
   email: string;
   role: string;
   departmentId?: ID;
-  /** "pending" = signed up in the app, waiting for an administrator's approval. */
-  status: "active" | "inactive" | "pending";
-  /** Whether the user has a password, i.e. can sign in. */
-  hasPassword: boolean;
-}
-
-export type Permission = "administrator" | "inventory_manager" | "technician" | "read_only";
-
-/** The signed-in user. */
-export interface Actor {
-  id: ID;
-  name: string;
-  email: string;
-  role: string;
-  permission: Permission;
+  status: "active" | "inactive";
 }
 
 export interface Department {

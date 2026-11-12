@@ -5,7 +5,6 @@ import {
 } from "recharts";
 import { Boxes, Package, CheckCircle2, AlertTriangle, XCircle, TrendingUp, FileText, Plus, ShoppingCart } from "lucide-react";
 import { DataState } from "../components/DataState";
-import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
 import { downloadStockOnHand } from "../lib/reports";
 import {
@@ -59,8 +58,6 @@ function DonutChart({ data, total, label }: { data: DonutEntry[]; total: number;
 export function Dashboard() {
   useData();
   const navigate = useNavigate();
-  const { canManage } = usePermissions();
-  const actions = quickActions.filter((a) => canManage || !a.to.includes("new=1"));
   const stats = getDashboardStats();
   const categoryData = getStockByCategory();
   const inventoryStatusData = getInventoryStatusBreakdown();
@@ -94,14 +91,12 @@ export function Dashboard() {
           >
             <FileText size={15} /> Export Report
           </button>
-          {canManage && (
-            <button
-              onClick={() => navigate("/inventory?new=1")}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              <Plus size={15} /> Add New
-            </button>
-          )}
+          <button
+            onClick={() => navigate("/inventory?new=1")}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <Plus size={15} /> Add New
+          </button>
         </div>
       </div>
 
@@ -216,7 +211,7 @@ export function Dashboard() {
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="mb-4 text-sm font-semibold text-gray-900">Quick Actions</p>
           <div className="space-y-3">
-            {actions.map((action) => {
+            {quickActions.map((action) => {
               const Icon = action.icon;
               return (
                 <button key={action.label} onClick={() => navigate(action.to)} className="flex w-full items-center gap-3 rounded-lg border border-gray-100 p-3 text-left hover:bg-gray-50">

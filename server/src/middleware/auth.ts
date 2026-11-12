@@ -1,74 +1,56 @@
+import { eq } from "drizzle-orm";
 import type { NextFunction, Request, Response } from "express";
-import type { users } from "../db/schema.js";
-import { findSessionUser } from "../services/sessions.js";
+import { db } from "../db/client.js";
+import { users } from "../db/schema.js";
 
-// Session authentication. Clients sign in at POST /api/auth/login and send the
-// returned token as `Authorization: Bearer <token>`. The user's job-title
-// `role` is mapped onto one of four permission tiers that the route guards check.
-export type Permission = "administrator" | "inventory_manager" | "technician" | "read_only";
-
+// No sign-in: the app is used by a two-person IT department, and every request
+// acts as one shared "IT Department" user. That user is still recorded on each
+// inventory transaction (the history's "By" column), which the database
+// requires. Anyone who can reach the API can read and change everything, so
+// keep the site's address private.
 export interface Actor {
   id: string;
   name: string;
-  email: string;
-  role: string;
-  permission: Permission;
 }
 
 declare module "express-serve-static-core" {
   interface Request {
     actor?: Actor;
-    sessionToken?: string;
   }
 }
 
-export function derivePermission(role: string): Permission {
-  const normalized = role.toLowerCase();
-  if (normalized.includes("administrator")) return "administrator";
-  if (normalized.includes("manager")) return "inventory_manager";
-  if (normalized.includes("support") || normalized.includes("technician") || normalized.includes("engineer")) {
-    return "technician";
-  }
-  return "read_only";
+export const DEPARTMENT_USER_EMAIL = "it-department@local.invalid";
+
+let cached: Actor | null = null;
+
+/** Finds the shared department user, creating it the first time. */
+export async function getDepartmentActor(): Promise<Actor> {
+  if (cached) return cached;
+  const [existing] = await db.select().from(users).where(eq(users.email, DEPARTMENT_USER_EMAIL)).limit(1);
+  const user =
+    existing ??
+    (
+      await db
+        .insert(users)
+        .values({ name: "IT Department", email: DEPARTMENT_USER_EMAIL, role: "IT Department" })
+        .onConflictDoNothing({ target: users.email })
+        .returning()
+    )[0] ??
+    (await db.select().from(users).where(eq(users.email, DEPARTMENT_USER_EMAIL)).limit(1))[0];
+  cached = { id: user.id, name: user.name };
+  return cached;
 }
 
-export function toActor(user: typeof users.$inferSelect): Actor {
-  return { id: user.id, name: user.name, email: user.email, role: user.role, permission: derivePermission(user.role) };
+/** Test hook: forget the cached user (tests truncate the users table). */
+export function resetDepartmentActor() {
+  cached = null;
 }
 
-function bearerToken(req: Request): string | null {
-  const header = req.header("authorization");
-  const match = header?.match(/^Bearer\s+(\S+)$/i);
-  return match ? match[1] : null;
-}
-
-/** Rejects the request with 401 unless it carries a valid, unexpired session token. */
-export async function requireSession(req: Request, res: Response, next: NextFunction) {
+export async function attachDepartmentActor(req: Request, _res: Response, next: NextFunction) {
   try {
-    const token = bearerToken(req);
-    const found = token ? await findSessionUser(token) : null;
-    if (!token || !found) {
-      res.status(401).json({ error: "Please sign in." });
-      return;
-    }
-    req.actor = toActor(found.user);
-    req.sessionToken = token;
+    req.actor = await getDepartmentActor();
     next();
   } catch (err) {
     next(err);
   }
-}
-
-export function requirePermission(...allowed: Permission[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.actor) {
-      res.status(401).json({ error: "Please sign in." });
-      return;
-    }
-    if (!allowed.includes(req.actor.permission)) {
-      res.status(403).json({ error: "You do not have permission to perform this action." });
-      return;
-    }
-    next();
-  };
 }

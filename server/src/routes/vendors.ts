@@ -5,7 +5,6 @@ import { db } from "../db/client.js";
 import { purchaseOrders, vendors } from "../db/schema.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { ConflictError, NotFoundError } from "../lib/errors.js";
-import { requirePermission } from "../middleware/auth.js";
 
 export const vendorsRouter = Router();
 
@@ -27,7 +26,6 @@ const createSchema = z.object({
 
 vendorsRouter.post(
   "/",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = createSchema.parse(req.body);
     const [row] = await db.insert(vendors).values(body).returning();
@@ -46,7 +44,6 @@ const updateSchema = z.object({
 
 vendorsRouter.patch(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = updateSchema.parse(req.body);
     const [row] = await db
@@ -63,7 +60,6 @@ vendorsRouter.patch(
 // but purchase orders must keep their vendor, so a vendor with orders stays.
 vendorsRouter.delete(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const [order] = await db
       .select({ id: purchaseOrders.id })

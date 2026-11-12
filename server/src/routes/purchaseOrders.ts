@@ -6,7 +6,6 @@ import { purchaseOrderLines, purchaseOrders } from "../db/schema.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { NotFoundError } from "../lib/errors.js";
 import { toNumber } from "../lib/serialize.js";
-import { requirePermission } from "../middleware/auth.js";
 import { cancelPurchaseOrder, receivePurchaseOrder } from "../services/purchaseOrders.js";
 
 export const purchaseOrdersRouter = Router();
@@ -56,7 +55,6 @@ const createSchema = z.object({
 
 purchaseOrdersRouter.post(
   "/",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = createSchema.parse(req.body);
     const result = await db.transaction(async (tx) => {
@@ -89,7 +87,6 @@ purchaseOrdersRouter.post(
 
 purchaseOrdersRouter.post(
   "/:id/cancel",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const result = await cancelPurchaseOrder(req.params.id);
     res.json(result);
@@ -110,7 +107,6 @@ const receiveSchema = z.object({
 
 purchaseOrdersRouter.post(
   "/:id/receive",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = receiveSchema.parse(req.body);
     const result = await receivePurchaseOrder(req.params.id, body.locationId, body.lines, req.actor!.id);

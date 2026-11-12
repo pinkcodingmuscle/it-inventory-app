@@ -34,3 +34,6 @@ src/data/IT Inventory Workbook.xlsx
 # Playwright output
 test-results/
 playwright-report/
+
+# Netlify CLI local state
+.netlify/

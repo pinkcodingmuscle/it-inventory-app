@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { requirePermission } from "../middleware/auth.js";
 import {
   adjustStock,
   checkoutStock,
@@ -31,7 +30,6 @@ const createSchema = z.object({
 
 stockRouter.post(
   "/",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = createSchema.parse(req.body);
     const result = await createStockItem(body, req.actor!.id);
@@ -46,7 +44,6 @@ const checkoutSchema = z.object({
 
 stockRouter.post(
   "/:id/checkout",
-  requirePermission("administrator", "inventory_manager", "technician"),
   asyncHandler(async (req, res) => {
     const body = checkoutSchema.parse(req.body);
     const result = await checkoutStock(req.params.id, body.quantity, req.actor!.id, body);
@@ -56,7 +53,6 @@ stockRouter.post(
 
 stockRouter.post(
   "/:id/return",
-  requirePermission("administrator", "inventory_manager", "technician"),
   asyncHandler(async (req, res) => {
     const body = checkoutSchema.parse(req.body);
     const result = await returnStock(req.params.id, body.quantity, req.actor!.id, body);
@@ -71,7 +67,6 @@ const adjustSchema = z.object({
 
 stockRouter.post(
   "/:id/adjust",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = adjustSchema.parse(req.body);
     const result = await adjustStock(req.params.id, body.quantity, req.actor!.id, body.notes);
@@ -83,7 +78,6 @@ const updateSchema = z.object({ reorderPoint: z.number().int().min(0).nullable()
 
 stockRouter.patch(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = updateSchema.parse(req.body);
     res.json(await updateStockItem(req.params.id, body));
@@ -92,7 +86,6 @@ stockRouter.patch(
 
 stockRouter.delete(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     await deleteStockItem(req.params.id);
     res.status(204).end();

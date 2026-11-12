@@ -2,7 +2,6 @@ import { useState } from "react";
 import { AlertTriangle, History, Pencil, Plus, Search } from "lucide-react";
 import { DataState } from "../components/DataState";
 import { AddStockModal, EditStockModal, StockActionModal, StockHistoryModal, type StockAction } from "../components/StockForms";
-import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
 import type { StockStatus } from "../lib/inventory";
 import { getInventoryStats, listStockItems, type StockRow } from "../lib/selectors";
@@ -31,7 +30,6 @@ const selectClass = "h-10 rounded-lg border border-gray-200 bg-white px-3 text-s
 
 export function Inventory() {
   useData();
-  const { canManage, canMove } = usePermissions();
   const [search, setSearch]     = useState("");
   const [category, setCategory] = useState("All");
   const [status, setStatus]     = useState<StatusFilter>("all");
@@ -47,7 +45,7 @@ export function Inventory() {
       const t = params.get("type");
       setType(t === "consumable" || t === "accessory" ? t : "all");
     }
-    if (params.get("new") === "1" && canManage) setDialog({ kind: "add" });
+    if (params.get("new") === "1") setDialog({ kind: "add" });
   });
 
   const inventoryData = listStockItems();
@@ -116,15 +114,13 @@ export function Inventory() {
         <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} aria-label="Status" className={selectClass}>
           {Object.entries(statusFilters).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        {canManage && (
-          <button
-            onClick={() => setDialog({ kind: "add" })}
-            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            <Plus size={16} />
-            Add Item
-          </button>
-        )}
+        <button
+          onClick={() => setDialog({ kind: "add" })}
+          className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Plus size={16} />
+          Add Item
+        </button>
       </div>
 
       <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -165,39 +161,33 @@ export function Inventory() {
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">
-                  {canMove && (
-                    <>
-                      <button
-                        onClick={() => setDialog({ kind: "checkout", row: item })}
-                        disabled={item.available === 0}
-                        title={item.available === 0 ? "Nothing available to check out" : undefined}
-                        className={`${actionButton} text-blue-600`}
-                      >
-                        Check out
-                      </button>
-                      <button
-                        onClick={() => setDialog({ kind: "return", row: item })}
-                        disabled={item.inUse === 0}
-                        title={item.inUse === 0 ? "Nothing is checked out" : undefined}
-                        className={`${actionButton} text-gray-600`}
-                      >
-                        Return
-                      </button>
-                    </>
-                  )}
-                  {canManage && (
-                    <button onClick={() => setDialog({ kind: "adjust", row: item })} className={`${actionButton} text-gray-600`}>
-                      Adjust
+                  <>
+                    <button
+                      onClick={() => setDialog({ kind: "checkout", row: item })}
+                      disabled={item.available === 0}
+                      title={item.available === 0 ? "Nothing available to check out" : undefined}
+                      className={`${actionButton} text-blue-600`}
+                    >
+                      Check out
                     </button>
-                  )}
+                    <button
+                      onClick={() => setDialog({ kind: "return", row: item })}
+                      disabled={item.inUse === 0}
+                      title={item.inUse === 0 ? "Nothing is checked out" : undefined}
+                      className={`${actionButton} text-gray-600`}
+                    >
+                      Return
+                    </button>
+                  </>
+                  <button onClick={() => setDialog({ kind: "adjust", row: item })} className={`${actionButton} text-gray-600`}>
+                    Adjust
+                  </button>
                   <button onClick={() => setDialog({ kind: "history", row: item })} aria-label={`History of ${item.name}`} title="History" className={iconButton}>
                     <History size={15} />
                   </button>
-                  {canManage && (
-                    <button onClick={() => setDialog({ kind: "edit", row: item })} aria-label={`Edit ${item.name}`} title="Edit" className={iconButton}>
-                      <Pencil size={14} />
-                    </button>
-                  )}
+                  <button onClick={() => setDialog({ kind: "edit", row: item })} aria-label={`Edit ${item.name}`} title="Edit" className={iconButton}>
+                    <Pencil size={14} />
+                  </button>
                 </td>
               </tr>
             ))}

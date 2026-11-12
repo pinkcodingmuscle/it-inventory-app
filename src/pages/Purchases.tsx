@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { DataState } from "../components/DataState";
 import { NewPurchaseOrderModal, ReceivePurchaseOrderModal } from "../components/PurchaseOrderForms";
-import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
 import { cancelPurchaseOrder } from "../lib/api";
 import { useLinkParams } from "../lib/useLinkParams";
@@ -26,7 +25,6 @@ const filterLabels: Record<Filter, string> = {
 
 export function Purchases() {
   const { refresh } = useData();
-  const { canManage } = usePermissions();
   const [search, setSearch]             = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [creating, setCreating]         = useState(false);
@@ -36,7 +34,7 @@ export function Purchases() {
   // Links from the Dashboard and header search: ?new=1, ?q=...
   useLinkParams((params) => {
     if (params.has("q")) { setSearch(params.get("q") ?? ""); setActiveFilter("All"); }
-    if (params.get("new") === "1" && canManage) setCreating(true);
+    if (params.get("new") === "1") setCreating(true);
   });
 
   async function handleCancel(id: string, poNumber: string) {
@@ -107,15 +105,13 @@ export function Purchases() {
             </button>
           ))}
         </div>
-        {canManage && (
-          <button
-            onClick={() => setCreating(true)}
-            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            <Plus size={16} />
-            New Purchase Order
-          </button>
-        )}
+        <button
+          onClick={() => setCreating(true)}
+          className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Plus size={16} />
+          New Purchase Order
+        </button>
       </div>
 
       {rowError && (
@@ -151,7 +147,7 @@ export function Purchases() {
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-right">
-                  {p.status === "open" && canManage && (
+                  {p.status === "open" && (
                     <>
                       <button
                         onClick={() => setReceivingId(p.id)}

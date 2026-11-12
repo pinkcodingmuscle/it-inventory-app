@@ -164,8 +164,8 @@ export async function importWorkbook(options: ImportOptions): Promise<ImportSumm
   if (!options.replace) throw new Error("Importing real data requires --replace. Run with --dry-run first.");
 
   await db.transaction(async (tx) => {
-    // Replace inventory data, but keep users and departments: they hold sign-in
-    // accounts (passwords, sessions) that have nothing to do with the workbook.
+    // Replace inventory data, but keep users and departments (e.g. the shared
+    // "IT Department" user), which have nothing to do with the workbook.
     await tx.execute(sql`
       TRUNCATE TABLE
         inventory_transactions, stock_items,
@@ -178,8 +178,7 @@ export async function importWorkbook(options: ImportOptions): Promise<ImportSumm
     const importerDepartment =
       (await tx.select().from(departments).where(eq(departments.name, "Imported")).limit(1))[0] ??
       (await tx.insert(departments).values({ name: "Imported" }).returning())[0];
-    // The importer is recorded as performing the initial-stock transactions. It
-    // has no password, so nobody can sign in as it.
+    // The importer is recorded as performing the initial-stock transactions.
     const importer =
       (await tx.select().from(users).where(eq(users.email, importerEmail)).limit(1))[0] ??
       (await tx.insert(users).values({

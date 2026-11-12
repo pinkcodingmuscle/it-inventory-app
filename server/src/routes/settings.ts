@@ -4,7 +4,6 @@ import { z } from "zod";
 import { db } from "../db/client.js";
 import { appSettings } from "../db/schema.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { requirePermission } from "../middleware/auth.js";
 
 export const settingsRouter = Router();
 
@@ -45,7 +44,6 @@ settingsRouter.get(
 
 settingsRouter.put(
   "/",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const settings = settingsSchema.parse(req.body);
     const [row] = await db

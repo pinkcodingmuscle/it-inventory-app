@@ -6,7 +6,6 @@ import { catalogItems, inventoryTransactions, purchaseOrderLines, stockItems } f
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { ConflictError, NotFoundError } from "../lib/errors.js";
 import { toNumber } from "../lib/serialize.js";
-import { requirePermission } from "../middleware/auth.js";
 
 export const catalogItemsRouter = Router();
 
@@ -35,7 +34,6 @@ const createSchema = z.object({
 
 catalogItemsRouter.post(
   "/",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = createSchema.parse(req.body);
     const [row] = await db
@@ -60,7 +58,6 @@ const updateSchema = z.object({
 
 catalogItemsRouter.patch(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const body = updateSchema.parse(req.body);
     const [row] = await db
@@ -81,7 +78,6 @@ catalogItemsRouter.patch(
 // otherwise the history would lose its item names.
 catalogItemsRouter.delete(
   "/:id",
-  requirePermission("administrator", "inventory_manager"),
   asyncHandler(async (req, res) => {
     const id = req.params.id;
     const [stock] = await db.select({ id: stockItems.id }).from(stockItems).where(eq(stockItems.catalogItemId, id)).limit(1);

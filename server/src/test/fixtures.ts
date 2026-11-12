@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { createSession } from "../services/sessions.js";
+import { resetDepartmentActor } from "../middleware/auth.js";
 import {
   catalogItems,
   departments,
@@ -14,9 +14,10 @@ import {
 
 /** Truncates every domain table and inserts a small, consistent fixture set for one test. */
 export async function resetAndSeed() {
+  resetDepartmentActor();
   await db.execute(sql`
     TRUNCATE TABLE
-      sessions, app_settings,
+      app_settings,
       inventory_transactions, stock_items,
       purchase_order_lines, purchase_orders, catalog_items,
       vendors, locations, users, departments
@@ -55,12 +56,7 @@ export async function resetAndSeed() {
     .values({ purchaseOrderId: po.id, catalogItemId: consumableCatalogItem.id, quantity: 20, unitPrice: "5" })
     .returning();
 
-  // Authorization headers for each fixture user, from real sessions.
-  const header = async (userId: string) => ({ Authorization: `Bearer ${(await createSession(userId)).token}` });
-  const auth = { admin: await header(admin.id), tech: await header(tech.id), readOnly: await header(readOnly.id) };
-
   return {
-    auth,
     dept,
     admin,
     tech,

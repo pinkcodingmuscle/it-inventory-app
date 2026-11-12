@@ -2,7 +2,6 @@ import { useState } from "react";
 import { MapPin, Pencil, Plus, Search } from "lucide-react";
 import { DataState } from "../components/DataState";
 import { Field, FormError, Modal, inputClass, primaryButtonClass, secondaryButtonClass } from "../components/Modal";
-import { usePermissions } from "../context/authValue";
 import { useData } from "../context/useData";
 import { appData } from "../data/store";
 import { createLocation, deleteLocation, updateLocation } from "../lib/api";
@@ -136,13 +135,12 @@ function LocationModal({ row, onClose }: { row?: LocationRow; onClose: () => voi
 
 export default function Locations() {
   useData();
-  const { canManage } = usePermissions();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<LocationRow | "new" | null>(null);
 
   // "+ Add Location" on the Settings page links here with ?new=1.
   useLinkParams((params) => {
-    if (params.get("new") === "1" && canManage) setEditing("new");
+    if (params.get("new") === "1") setEditing("new");
   });
 
   const locations = listLocations().sort((a, b) => a.name.localeCompare(b.name));
@@ -169,15 +167,13 @@ export default function Locations() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
           />
         </div>
-        {canManage && (
-          <button
-            onClick={() => setEditing("new")}
-            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            <Plus size={16} />
-            Add Location
-          </button>
-        )}
+        <button
+          onClick={() => setEditing("new")}
+          className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Plus size={16} />
+          Add Location
+        </button>
       </div>
 
       <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -212,16 +208,14 @@ export default function Locations() {
                 <td className="px-6 py-4 text-gray-600">{loc.manager}</td>
                 <td className="px-6 py-4 text-gray-500">{loc.notes}</td>
                 <td className="px-6 py-4 text-right">
-                  {canManage && (
-                    <button
-                      onClick={() => setEditing(loc)}
-                      aria-label={`Edit ${loc.name}`}
-                      title="Edit"
-                      className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setEditing(loc)}
+                    aria-label={`Edit ${loc.name}`}
+                    title="Edit"
+                    className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <Pencil size={14} />
+                  </button>
                 </td>
               </tr>
             ))}

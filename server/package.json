@@ -11,8 +11,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:import": "tsx src/import/importWorkbook.ts",
-    "test": "vitest run",
-    "user:set-password": "tsx src/scripts/setPassword.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -20,6 +19,7 @@
     "drizzle-orm": "^0.36.4",
     "express": "^4.21.1",
     "pg": "^8.13.1",
+    "serverless-http": "^3.2.0",
     "uuid": "^11.0.3",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"

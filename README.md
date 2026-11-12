@@ -27,10 +27,7 @@ npm run server:install
 npm run db:migrate
 npm run db:seed
 
-# 4. Give yourself a sign-in (seeded users have no passwords)
-npm run user:set-password -- e.mukuye@kayaku.com   # or any email, plus --name "Full Name" to create a new admin
-
-# 5. Install frontend dependencies
+# 4. Install frontend dependencies
 npm install
 ```
 
@@ -73,10 +70,9 @@ npm run db:migrate  # apply pending migrations
 npm run db:seed     # reset to the repeatable development dataset
 npm run db:import -- /absolute/path/to/inventory.xlsx --dry-run  # preview a real workbook
 npm run db:import -- /absolute/path/to/inventory.xlsx --replace   # replace development data after validation and backup
-npm run user:set-password -- you@example.com [--name "Full Name"] [--role "IT Administrator"]  # set a password / create a user
 ```
 
-The importer loads stock rows only; rows with an asset tag or serial number are skipped and counted as `skippedSerializedRows` in the summary. `--replace` replaces the inventory data (items, stock, history, vendors, locations, orders) but keeps users, so sign-ins survive a re-import. `db:seed` resets everything, users included.
+The importer loads stock rows only; rows with an asset tag or serial number are skipped and counted as `skippedSerializedRows` in the summary. `--replace` replaces the inventory data (items, stock, history, vendors, locations, orders) but keeps users. `db:seed` resets everything, users included.
 
 Migrations live in `server/migrations` and are generated from `server/src/db/schema.ts` via Drizzle Kit (`npm --prefix server run db:generate` after changing the schema).
 
@@ -86,39 +82,45 @@ Migrations live in `server/migrations` and are generated from `server/src/db/sch
 - `server/` — Express API, Drizzle ORM schema/migrations, and the transactional business logic for stock and purchase orders described in section 9 of the persistence proposal.
 - `docker-compose.yml` — local PostgreSQL 16 with a named volume.
 
-## Deployment (Render API + Neon Postgres)
+## Deployment (Netlify + Neon Postgres)
 
-Production uses [Neon](https://neon.tech) serverless Postgres (free tier) for the database and a Render Web Service for the API (`render.yaml`). Local development still uses Docker Postgres; nothing changes there.
+Production is one [Netlify](https://www.netlify.com) site plus a [Neon](https://neon.tech) database, both on free tiers:
 
-1. **Create the database.** Sign up at neon.tech and create a project, in the same region as the Render service: currently AWS US East 1 (N. Virginia) for Neon and `virginia` for Render. Each request makes several sequential queries, so a cross-country API↔database link adds hundreds of milliseconds. On the project dashboard, click **Connect** and copy the connection string. Use the **direct** string (pooling toggle off): the API keeps its own small connection pool, so Neon's pooler isn't needed.
+- **Netlify** serves the React frontend and runs the Express API as a serverless function (`netlify/functions/api.ts` → `server/src/netlify.ts`). `netlify.toml` sends `/api/*` to the function, so the app and API share one address: no CORS setup, and the frontend calls `/api` directly.
+- **Neon** holds the data. Local development still uses Docker Postgres; nothing changes there.
+
+1. **Create the database.** Sign up at neon.tech and create a project in AWS US East 1 (N. Virginia), close to Netlify's default function region (US East, Ohio). On the project dashboard, click **Connect**, turn **Connection pooling on**, and copy the connection string. Serverless functions start many short-lived instances, and the pooler stops them running out of database connections.
 2. **Make the URL verify TLS.** Replace the `sslmode=require` at the end of the copied URL with `sslmode=verify-full`. (node-postgres treats `require` as `verify-full` anyway and prints a security warning about it.)
    ```text
-   postgresql://USER:PASSWORD@ep-xxx.us-west-2.aws.neon.tech/neondb?sslmode=verify-full
+   postgresql://USER:PASSWORD@ep-xxx-pooler.us-east-1.aws.neon.tech/neondb?sslmode=verify-full
    ```
-3. **Point Render at it.** In the Render dashboard, set the service's `DATABASE_URL` to that string. Also set `CORS_ORIGIN` to the frontend's URL, and `NODE_ENV=production`. On the next deploy, the `preDeployCommand` (`npm run db:migrate`) creates the schema in Neon.
-4. **Load data** (pick one, run from your machine):
+3. **Create the Netlify site.** In Netlify, choose **Add new project → Import an existing project**, and pick this GitHub repository. The build settings come from `netlify.toml`, so leave them as they are.
+4. **Set the database URL.** In **Site configuration → Environment variables**, add `DATABASE_URL` with the string from step 2. Give it to both **Builds** and **Functions** (the default "All scopes"). Then trigger a deploy. Each build:
+   1. installs the API's dependencies
+   2. applies pending database migrations (`npm run db:migrate`)
+   3. builds the frontend
+
+   Don't set `VITE_API_URL` on Netlify; production uses `/api` automatically.
+5. **Load data** (pick one, run from your machine):
    ```bash
    # Fresh development dataset
    DATABASE_URL='<neon url>' npm run db:seed
    # Real workbook
    DATABASE_URL='<neon url>' npm run db:import -- /absolute/path/to/inventory.xlsx --replace
-   # Or copy an existing database (e.g. a previous Render Postgres)
+   # Or copy an existing database
    pg_dump --no-owner --no-acl -Fc '<old url>' -f inventory.dump
    pg_restore --no-owner --no-acl -d '<neon url>' inventory.dump
    ```
    An exported `DATABASE_URL` overrides the one in `.env`.
-5. **Create the first sign-in.** Nobody can sign in until someone has a password. Create yourself as an administrator (you'll be asked for the password twice; it isn't echoed):
-   ```bash
-   DATABASE_URL='<neon url>' npm run user:set-password -- you@example.com --name "Your Name"
-   ```
-   Then add everyone else from **Settings → Users** in the app.
-6. **Frontend.** Build it with `VITE_API_URL=https://<render-service>.onrender.com/api` (set it in Netlify's environment variables).
+
+Every push to the branch Netlify builds from (usually `main`) deploys automatically, migrations included. Netlify also builds a preview for each pull request; preview builds run migrations against the same `DATABASE_URL`, so either give previews their own Neon branch (Environment variables → *Deploy contexts*) or review migrations before opening a PR.
 
 Notes:
 - If `DATABASE_URL` points anywhere other than localhost and has no `sslmode`, the API requires TLS anyway (`server/src/db/client.ts`).
-- Neon's free compute suspends after a few minutes idle; the first query afterwards takes roughly a second while it wakes. `/api/health` deliberately doesn't touch the database, so Render's health checks don't keep it awake and use up the free compute hours.
-- Neon's free tier keeps only a short restore history. For business data, take regular `pg_dump` backups as well.
-- Tests never use the Neon URL unless you point them at it: they read `TEST_DATABASE_URL` first, then fall back to a local test database.
+- **First requests are slow:** after a quiet period, the first request can take a few seconds while Netlify starts the function and Neon wakes its compute (it suspends after a few minutes idle). Later requests are fast.
+- **Database connections:** each function instance keeps a small pool of 3 connections (`PG_POOL_MAX` to change).
+- **Backups:** Neon's free tier keeps only a short restore history. For business data, take regular `pg_dump` backups as well.
+- **Tests:** they never use the Neon URL unless you point them at it. They read `TEST_DATABASE_URL` first, then fall back to a local test database.
 
 ## Trying risky changes on a Neon branch
 
@@ -134,20 +136,13 @@ neon branches delete try-import                   # discard it
 
 If it went well, repeat the command against production.
 
-## Sign-in and permissions
+## Access (no sign-in)
 
-Everyone signs in with an email and password (`POST /api/auth/login`). New staff can request an account from the sign-in page's **Create account** tab (`POST /api/auth/signup`): the account starts as *pending* with view-only access and can't sign in until an administrator approves it, choosing its role, in **Settings → Users** (the bell shows administrators how many requests are waiting). Declining deletes the request. Sign-ups are limited to 20 per IP address per hour (`SIGNUPS_PER_HOUR` to change). The very first administrator still has to be created with `npm run user:set-password`, so a stranger can't sign up and approve themselves. Passwords are stored as scrypt hashes; the browser holds a random session token (7 days), and only its SHA-256 hash is stored in the `sessions` table. Every API route except `/api/auth/login` and `/api/health` requires a session. After 10 failed sign-ins for one email or IP address within 15 minutes, further attempts are refused until the window passes.
+There is no sign-in: the app is used by a two-person IT department, so it opens straight to the Dashboard and everyone can do everything. Every change is recorded in the item history as the shared **"IT Department"** user (created automatically the first time the API runs). Stock imported from the workbook shows as **"Data Importer"**.
 
-The `users` table holds the IT staff who operate the system (for permissions and the transaction audit trail), not tracked end users. Each user's job-title `role` maps onto a permission tier (`server/src/middleware/auth.ts`):
-
-| Role contains | Tier | Can |
-| --- | --- | --- |
-| "Administrator" | administrator | everything, including **Settings → Users** (add users, change roles, deactivate, reset passwords) |
-| "Manager" | inventory manager | add/edit/delete items, vendors, locations and purchase orders; recount stock; change settings |
-| "Support", "Technician" or "Engineer" | technician | view everything; check stock out and back in |
-| anything else (e.g. "Viewer") | read only | view everything |
-
-The UI hides actions a user can't perform, and the API enforces the same rules. Forgotten passwords are reset by an administrator in Settings, or with `npm run user:set-password` from a machine with database access.
+**Anyone who has the site's address can view, change and delete the inventory.** Netlify addresses are public, so keep the link private. If that ever becomes a concern, the options are:
+- Netlify's site-wide password protection (a paid Netlify feature)
+- adding a sign-in back (it existed in commit `a816ef0`)
 
 ## Tests
 

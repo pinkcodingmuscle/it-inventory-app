@@ -1,21 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Credentials for two users in the throwaway test database (see e2e/README.md).
-const admin = { email: process.env.E2E_ADMIN_EMAIL ?? "", password: process.env.E2E_ADMIN_PASSWORD ?? "" };
-const tech = { email: process.env.E2E_TECH_EMAIL ?? "", password: process.env.E2E_TECH_PASSWORD ?? "" };
-
-test.skip(!admin.email || !admin.password, "Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD (see e2e/README.md)");
+// Drives the app in a browser. There is no sign-in: every page opens directly.
+// Run it against a throwaway database (see e2e/README.md), never production.
 
 // Unique names so reruns don't collide with earlier runs' leftovers.
 const run = Date.now().toString(36);
 
-async function signIn(page: Page, who = admin) {
+/** Opens the app and waits until the first page has loaded. */
+async function open(page: Page) {
   await page.goto("/");
-  await page.getByLabel("Email").fill(who.email);
-  await page.getByLabel("Password").fill(who.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  // The account button only exists once signed in (the page title is hidden on phones).
-  await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Inventory" }).or(page.getByRole("button", { name: "Open menu" })).first()).toBeVisible();
+  // The first load after the API starts can be slow; allow for it.
+  await expect(page.getByText("Loading…")).toHaveCount(0, { timeout: 30_000 });
 }
 
 /** Fails the test on any uncaught page error or console error. */
@@ -23,8 +19,7 @@ function watchConsole(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => {
-    // Rejected sign-ins (401 wrong password, 403 awaiting approval) are expected network errors.
-    if (m.type() === "error" && !/40[13] \((Unauthorized|Forbidden)\)/.test(m.text())) errors.push(m.text());
+    if (m.type() === "error") errors.push(m.text());
   });
   return errors;
 }
@@ -32,84 +27,18 @@ function watchConsole(page: Page) {
 const dialog = (page: Page) => page.getByRole("dialog");
 const row = (page: Page, text: string) => page.locator("tbody tr", { hasText: text });
 
-test.describe("signing in", () => {
-  test("rejects a wrong password, then signs in, survives a reload, and signs out", async ({ page }) => {
-    const errors = watchConsole(page);
-    await page.goto("/inventory");
-    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-
-    await page.getByLabel("Email").fill(admin.email);
-    await page.getByLabel("Password").fill("definitely wrong");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("alert")).toContainText("Incorrect email or password");
-
-    await page.getByLabel("Password").fill(admin.password);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
-
-    await page.reload();
-    await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
-
-    await page.getByRole("button", { name: /^Account:/ }).click();
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-    await page.reload();
-    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-    expect(errors).toEqual([]);
-  });
+test("opens straight to the Dashboard with no sign-in", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/inventory");
+  await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
-test.describe("signing up", () => {
-  test("a new person requests an account, waits, is approved from the bell, then signs in", async ({ page, browser }) => {
-    const errors = watchConsole(page);
-    const email = `newcomer-${run}@example.com`;
-    const declined = `declined-${run}@example.com`;
-
-    // Two people request accounts.
-    for (const who of [email, declined]) {
-      await page.goto("/");
-      await page.getByRole("tab", { name: "Create account" }).click();
-      await page.getByLabel("Full name").fill(`Newcomer ${who}`);
-      await page.getByLabel("Email").fill(who);
-      await page.getByLabel("Password", { exact: true }).fill("newcomer-password");
-      await page.getByLabel("Repeat password").fill("newcomer-password");
-      await page.getByRole("button", { name: "Request account" }).click();
-      await expect(page.getByRole("status")).toContainText("An administrator needs to approve your account");
-    }
-
-    // Signing in before approval explains why it doesn't work.
-    await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill("newcomer-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("alert")).toContainText("waiting for an administrator");
-
-    // The administrator sees the requests from the bell, approves one and declines the other.
-    const adminPage = await browser.newPage();
-    await signIn(adminPage);
-    await adminPage.getByRole("button", { name: /^Alerts/ }).click();
-    await adminPage.getByRole("button", { name: /sign-up requests? to approve/ }).click();
-    await expect(adminPage.getByText(/sign-up requests? waiting for approval/)).toBeVisible();
-    const request = adminPage.locator("li", { hasText: email });
-    await request.getByLabel(/^Role for/).selectOption("Tech Support");
-    await request.getByRole("button", { name: "Approve" }).click();
-    await expect(adminPage.locator("tbody tr", { hasText: email })).toContainText("Tech Support");
-    adminPage.once("dialog", (d) => d.accept());
-    await adminPage.locator("li", { hasText: declined }).getByRole("button", { name: "Decline" }).click();
-    await expect(adminPage.getByText(declined)).toHaveCount(0);
-    await adminPage.close();
-
-    // Now the approved person can sign in, with technician access.
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
-    await page.goto("/inventory");
-    await expect(page.getByRole("button", { name: "Add Item" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Check out" }).first()).toBeVisible();
-    expect(errors).toEqual([]);
-  });
-});
-
-test.describe("as an administrator", () => {
-  test.beforeEach(async ({ page }) => signIn(page));
+test.describe("managing inventory", () => {
+  test.beforeEach(async ({ page }) => open(page));
 
   test("adds an item, checks some out, sees the history, edits it, and removes it", async ({ page }) => {
     const errors = watchConsole(page);
@@ -244,38 +173,10 @@ test.describe("as an administrator", () => {
 
     // A completely separate browser session sees the same value.
     const other = await browser.newPage();
-    await signIn(other);
+    await open(other);
     await other.goto("/settings");
     await expect(other.getByPlaceholder("e.g. it-help@yourcompany.com")).toHaveValue(email);
     await other.close();
-    expect(errors).toEqual([]);
-  });
-
-  test("an administrator adds a user who can then sign in", async ({ page, browser }) => {
-    const errors = watchConsole(page);
-    const email = `viewer-${run}@example.com`;
-    await page.goto("/settings");
-    await page.getByRole("button", { name: "Add User" }).click();
-    await dialog(page).getByLabel("Name *").fill(`E2E Viewer ${run}`);
-    await dialog(page).getByLabel("Email *").fill(email);
-    await dialog(page).getByLabel("Role").selectOption("Viewer");
-    await dialog(page).getByLabel("Password").fill("viewer-password");
-    await dialog(page).getByRole("button", { name: "Add User" }).click();
-    await expect(row(page, email)).toContainText("Can sign in");
-
-    const other = await browser.newPage();
-    await signIn(other, { email, password: "viewer-password" });
-    // A read-only user sees data but none of the buttons that change it.
-    await other.goto("/inventory");
-    await expect(other.getByRole("button", { name: "Add Item" })).toHaveCount(0);
-    await expect(other.getByRole("button", { name: "Check out" })).toHaveCount(0);
-    await other.close();
-
-    // Deactivate them again so the test database doesn't fill up with live accounts.
-    await row(page, email).getByRole("button", { name: /^Edit / }).click();
-    await dialog(page).getByLabel(/Active/).uncheck();
-    await dialog(page).getByRole("button", { name: "Save" }).click();
-    await expect(row(page, email)).toContainText("Inactive");
     expect(errors).toEqual([]);
   });
 
@@ -289,26 +190,11 @@ test.describe("as an administrator", () => {
   });
 });
 
-test.describe("as a technician", () => {
-  test.skip(!tech.email || !tech.password, "Set E2E_TECH_EMAIL and E2E_TECH_PASSWORD");
-
-  test("can check stock out but not add items, change settings, or manage users", async ({ page }) => {
-    await signIn(page, tech);
-    await page.goto("/inventory");
-    await expect(page.getByRole("button", { name: "Add Item" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Check out" }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Edit / })).toHaveCount(0);
-    await page.goto("/settings");
-    await expect(page.getByRole("button", { name: "Save Changes" })).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Users" })).toHaveCount(0);
-  });
-});
-
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("every page fits the screen and the menu opens as a drawer", async ({ page }) => {
-    await signIn(page);
+    await open(page);
     for (const path of ["/", "/inventory", "/purchases", "/vendors", "/locations", "/reports", "/settings"]) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");

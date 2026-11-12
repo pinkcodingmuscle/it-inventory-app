@@ -1,8 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { errorHandler } from "./middleware/errorHandler.js";
-import { requireSession } from "./middleware/auth.js";
-import { authRouter } from "./routes/auth.js";
+import { attachDepartmentActor } from "./middleware/auth.js";
 import { catalogItemsRouter } from "./routes/catalogItems.js";
 import { departmentsRouter } from "./routes/departments.js";
 import { inventoryTransactionsRouter } from "./routes/inventoryTransactions.js";
@@ -25,18 +24,14 @@ export function createApp() {
     })
   );
   app.use(express.json());
-  // Render (and most hosts) sit behind one proxy; trust it so req.ip is the
-  // real client address for the sign-in rate limit.
-  app.set("trust proxy", 1);
 
-  // Deliberately does not query the database: Render pings this every few
-  // seconds, and a DB check would keep a Neon free-tier compute awake 24/7
-  // and burn through its monthly compute allowance.
+  // Deliberately does not query the database: if an uptime monitor pings it
+  // every few seconds, a DB check would keep a Neon free-tier compute awake
+  // 24/7 and burn through its monthly compute allowance.
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 
-  // Sign-in is the only API route that works without a session.
-  app.use("/api/auth", authRouter);
-  app.use("/api", requireSession);
+  // No sign-in: every request acts as the shared department user.
+  app.use("/api", attachDepartmentActor);
 
   app.use("/api/departments", departmentsRouter);
   app.use("/api/users", usersRouter);
